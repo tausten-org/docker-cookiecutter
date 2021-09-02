@@ -19,6 +19,9 @@ if [ "$1" = 'cookiecutter' ]; then
 
     shift
     exec cookiecutter $OUT_FOLDER_ARG $CFG_FILE_ARG $@
+elif [ "$1" = 'docker' ]; then
+    # We're wanting to transform a candidate docker commandline
+    exec python /util/commandline.py $@
+else
+    exec $@
 fi
-
-exec $@

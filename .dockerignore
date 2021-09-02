@@ -1,0 +1,9 @@
+# By default, we don't want anything in the docker context, so we'll manage by 
+# exception, rather than inclusion.
+*
+*/*
+
+# TODO: Add exceptions to the exclusions here on case-by-case basis
+!requirements.txt
+!entrypoint.sh
+!util/*.py
