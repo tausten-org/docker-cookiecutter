@@ -5,5 +5,7 @@
 
 # TODO: Add exceptions to the exclusions here on case-by-case basis
 !requirements.txt
+!requirements_dev.txt
 !entrypoint.sh
 !util/*.py
+!test/*.py
