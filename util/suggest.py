@@ -1,6 +1,7 @@
 import sys
 import argparse
 
+docker_preamble = ["docker", "run", "-it", "--rm"]
 docker_user = ["--user", '"$(id -u):$(id -g)"']
 cookiecutter_cmd_and_preamble = ["cookiecutter", "-o", "/out"]
 
@@ -38,17 +39,15 @@ def is_fs_template(template):
     
     return True
 
-# We only care about a few of the docker options explicitly.. the rest, we want to let pass through
-def prepare_docker_option_parser():
-    parser = argparse.ArgumentParser()
-#    parser.add_argument('--version', '-V', action='store_true')
-    return parser
-
+docker_args_to_prune = docker_preamble + ["-i", "-t"]
 
 def parse_docker(args):
     # TODO: split things out better (i.e. handle any conflicting volume mounts)
     image = args[-1]
-    extra = args[1:-1] if args[0].startswith("docker") else args[:-1]
+
+    # hacky pruning of the --rm and -it because we'll add them back explicitly later
+    extra = [x for x in args[:-1] if x not in docker_args_to_prune]
+
     return [], image, extra
 
 # For the options that we're attempting to process and pass through,
@@ -101,7 +100,7 @@ def cookiecutter_to_docker_args(args):
     _, docker_image, docker_extra = parse_docker(docker[1:])
     cc_parsed, cc_template, cc_extra = parse_cookiecutter(cookiecutter[1:])
 
-    result = ["docker"] + docker_extra + docker_user
+    result = docker_preamble + docker_extra + docker_user
 
     # volume mount for template if it's a filesystem input
     if is_fs_template(cc_template):

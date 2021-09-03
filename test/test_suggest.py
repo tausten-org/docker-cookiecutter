@@ -33,9 +33,11 @@ def test_docker_v_args(given_host, given_container, want):
 
 some_image = "some-image:some-tag"
 
-input_docker_preamble = ["docker", "run", "-it", "--rm"]
+input_docker_preamble_base = ["docker", "run"]
 
-expected_docker_preamble = input_docker_preamble + ["--user", '"$(id -u):$(id -g)"']
+input_docker_preamble_expanded = input_docker_preamble_base + ["-it", "--rm"]
+
+expected_docker_preamble = input_docker_preamble_expanded + ["--user", '"$(id -u):$(id -g)"']
 
 expected_o = ["-o", "/out"]
 
@@ -43,21 +45,28 @@ expected_cmd_preamble = ["cookiecutter"] + expected_o
 
 @pytest.mark.parametrize(
     "given,want", [
-    pytest.param(input_docker_preamble + [some_image, "cookiecutter", "-f", "-s"], 
+    pytest.param(input_docker_preamble_expanded + [some_image, "cookiecutter", "-f", "-s"], 
         expected_docker_preamble 
         + suggest.docker_v_args('"$(pwd)"', "/out") 
         + [some_image]
         + expected_cmd_preamble + ["--overwrite-if-exists", "--skip-if-file-exists"], 
     id="normal"),
 
-    pytest.param(input_docker_preamble + [some_image, "cookiecutter", "--verbose", "-o", "/some/path"], 
+    pytest.param(input_docker_preamble_base + [some_image, "cookiecutter", "-f", "-s"], 
+        expected_docker_preamble 
+        + suggest.docker_v_args('"$(pwd)"', "/out") 
+        + [some_image]
+        + expected_cmd_preamble + ["--overwrite-if-exists", "--skip-if-file-exists"], 
+    id="normal - input missing -it --rm"),
+
+    pytest.param(input_docker_preamble_expanded + [some_image, "cookiecutter", "--verbose", "-o", "/some/path"], 
         expected_docker_preamble 
         + suggest.docker_v_args("/some/path", "/out") 
         + [some_image]
         + expected_cmd_preamble + ["--verbose"], 
     id="-o maps to docker -v"),
 
-    pytest.param(input_docker_preamble + [some_image, "cookiecutter", "-c", "the-branch", "/some/path"], 
+    pytest.param(input_docker_preamble_expanded + [some_image, "cookiecutter", "-c", "the-branch", "/some/path"], 
         expected_docker_preamble 
         + suggest.docker_v_args("/some/path", "/in") 
         + suggest.docker_v_args('"$(pwd)"', "/out") 
