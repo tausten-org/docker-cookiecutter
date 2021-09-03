@@ -1,9 +1,6 @@
 ARG PYTHON_VARIANT="3-alpine"
 FROM python:${PYTHON_VARIANT} AS build
 
-ARG CFG_FILE=".cookiecutterrc"
-ENV CFG_FILE=$CFG_FILE
-
 # Take care of pip requirements
 COPY requirements.txt /tmp/pip-tmp/
 RUN pip3 --disable-pip-version-check --no-cache-dir install -r /tmp/pip-tmp/requirements.txt \
