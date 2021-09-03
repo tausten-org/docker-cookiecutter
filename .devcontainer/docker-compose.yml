@@ -1,0 +1,15 @@
+version: "3.8"
+
+services:
+  app:
+    command: sleep infinity
+    build:
+      context: ..
+      dockerfile: .devcontainer/Dockerfile
+      args: 
+        VARIANT: "3"
+        NODE_VERSION: "none"
+    volumes:
+      - ..:/docker-cookiecutter
+    environment: 
+      DEV_CONTAINER: "1"

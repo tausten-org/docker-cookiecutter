@@ -1,0 +1,21 @@
+name: ci
+
+on:
+  push:
+    branches:
+      - main
+      - release*
+      - hotfix*
+  pull_request:
+    branches:
+      - main
+      - release*
+      - hotfix*
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Run the tests
+        run: make test
