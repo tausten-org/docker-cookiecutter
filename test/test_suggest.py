@@ -43,6 +43,8 @@ expected_o = ["-o", "/out"]
 
 expected_cmd_preamble = ["cookiecutter"] + expected_o
 
+some_gh_template = "gh:audreyr/cookiecutter-pypackage"
+
 @pytest.mark.parametrize(
     "given,want", [
     pytest.param(input_docker_preamble_expanded + [some_image, "cookiecutter", "-f", "-s"], 
@@ -58,6 +60,13 @@ expected_cmd_preamble = ["cookiecutter"] + expected_o
         + [some_image]
         + expected_cmd_preamble + ["--overwrite-if-exists", "--skip-if-file-exists"], 
     id="normal - input missing -it --rm"),
+
+    pytest.param(input_docker_preamble_base + [some_image, "cookiecutter", some_gh_template], 
+        expected_docker_preamble 
+        + suggest.docker_v_args('"$(pwd)"', "/out") 
+        + [some_image]
+        + expected_cmd_preamble + [some_gh_template], 
+    id="simple gh"),
 
     pytest.param(input_docker_preamble_expanded + [some_image, "cookiecutter", "--verbose", "-o", "/some/path"], 
         expected_docker_preamble 

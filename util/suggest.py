@@ -32,7 +32,7 @@ def is_fs_template(template):
 
     if "" == template \
         or "://" in template \
-        or template.startswith("hg:") \
+        or template.startswith("gh:") \
         or template.startswith("bb:") \
         or template.startswith("gl:"):
         return False
