@@ -1,8 +1,21 @@
 import sys
 import argparse
 
-docker_preamble = ["run", "-it", "--rm", "--user", '"$(id -u):$(id -g)"']
+docker_user = ["--user", '"$(id -u):$(id -g)"']
 cookiecutter_cmd_and_preamble = ["cookiecutter", "-o", "/out"]
+
+def split_docker_from_cookiecutter(given):
+    got_docker = got_cookiecutter = []
+    
+    for i, v in enumerate(given):
+        if v == "cookiecutter":
+            got_docker = given[:i]
+            got_cookiecutter = given[i:]
+            break
+    else:
+        got_docker = given
+
+    return got_docker, got_cookiecutter
 
 def docker_v_args(host, container):
     if host.startswith(".") or not host.startswith("/") and '$(pwd)' not in host:
@@ -25,9 +38,22 @@ def is_fs_template(template):
     
     return True
 
+# We only care about a few of the docker options explicitly.. the rest, we want to let pass through
+def prepare_docker_option_parser():
+    parser = argparse.ArgumentParser()
+#    parser.add_argument('--version', '-V', action='store_true')
+    return parser
+
+
+def parse_docker(args):
+    # TODO: split things out better (i.e. handle any conflicting volume mounts)
+    image = args[-1]
+    extra = args[1:-1] if args[0].startswith("docker") else args[:-1]
+    return [], image, extra
+
 # For the options that we're attempting to process and pass through,
 # see: https://cookiecutter.readthedocs.io/en/1.7.3/advanced/cli_options.html
-def prepare_option_parser():
+def prepare_cookiecutter_option_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument('--version', '-V', action='store_true')
     parser.add_argument('--no-input', action='store_true')
@@ -41,22 +67,22 @@ def prepare_option_parser():
     parser.add_argument('--config-file')
     parser.add_argument('--default-config', action='store_true')
     parser.add_argument('--debug-file')
-    parser.add_argument('TEMPLATE_AND_EXTRA', nargs=argparse.REMAINDER)
+    parser.add_argument('ITEM_AND_EXTRA', nargs=argparse.REMAINDER)
     return parser
 
-def parse(args):
-    parser = prepare_option_parser()
+def parse_cookiecutter(args):
+    parser = prepare_cookiecutter_option_parser()
     ns, _ = parser.parse_known_args(args)
     
-    template = None
-    if len(ns.TEMPLATE_AND_EXTRA) > 0:
-        template = ns.TEMPLATE_AND_EXTRA[0]
+    item = None
+    if len(ns.ITEM_AND_EXTRA) > 0:
+        item = ns.ITEM_AND_EXTRA[0]
     
     extra = None
-    if len(ns.TEMPLATE_AND_EXTRA) > 1:
-        extra = ns.TEMPLATE_AND_EXTRA[1:]
+    if len(ns.ITEM_AND_EXTRA) > 1:
+        extra = ns.ITEM_AND_EXTRA[1:]
 
-    return (ns, template, extra)
+    return (ns, item, extra)
 
 def quote_if_necessary(val):
     if not val.startswith('"') and not val.startswith("'") and " " in val:
@@ -66,61 +92,68 @@ def quote_if_necessary(val):
 
     return val
 
-def cookiecutter_to_docker_args(args):
-    ns, template, extra = parse(args)
+def quote_args(args):
+    return [quote_if_necessary(x) for x in args]
 
-    result = [] + docker_preamble
+def cookiecutter_to_docker_args(args):
+    docker, cookiecutter = split_docker_from_cookiecutter(args)
+
+    _, docker_image, docker_extra = parse_docker(docker[1:])
+    cc_parsed, cc_template, cc_extra = parse_cookiecutter(cookiecutter[1:])
+
+    result = ["docker"] + docker_extra + docker_user
 
     # volume mount for template if it's a filesystem input
-    if is_fs_template(template):
+    if is_fs_template(cc_template):
         new_template = "/in"
-        result += docker_v_args(template, new_template)
-        template = new_template
+        result += docker_v_args(cc_template, new_template)
+        cc_template = new_template
 
     # special handling of output - the preamble with always specify `-o /out`, and 
     # we just need to make sure we include the volume mount as needed
-    host_output_folder = ns.output_dir if ns.output_dir else '"$(pwd)"'
+    host_output_folder = cc_parsed.output_dir if cc_parsed.output_dir else '"$(pwd)"'
     result += docker_v_args(host_output_folder, "/out")
     
     # volume mount for config-file
     config_file = None
-    if ns.config_file:
+    if cc_parsed.config_file:
         config_file = "/user_cookiecutter_config.yml"
-        result += docker_v_args(ns.config_file, config_file)
+        result += docker_v_args(cc_parsed.config_file, config_file)
     
     # volume mount for debug-file
     debug_file = None
-    if ns.debug_file:
+    if cc_parsed.debug_file:
         debug_file = "/cookiecutter_debug.log"
-        result += docker_v_args(ns.debug_file, debug_file)
+        result += docker_v_args(cc_parsed.debug_file, debug_file)
 
-    # TODO: need to add the docker image
+    # wrap up the docker portion with the image
+    result += [ docker_image ]
 
     result += cookiecutter_cmd_and_preamble
 
     # Handle all the flag args
-    if ns.no_input: result.append('--no-input')
-    if ns.verbose: result.append('--verbose')
-    if ns.replay: result.append('--replay')
-    if ns.overwrite_if_exists: result.append('--overwrite-if-exists')
-    if ns.skip_if_file_exists: result.append('--skip-if-file-exists')
-    if ns.default_config: result.append('--default-config')
+    if cc_parsed.no_input: result.append('--no-input')
+    if cc_parsed.verbose: result.append('--verbose')
+    if cc_parsed.replay: result.append('--replay')
+    if cc_parsed.overwrite_if_exists: result.append('--overwrite-if-exists')
+    if cc_parsed.skip_if_file_exists: result.append('--skip-if-file-exists')
+    if cc_parsed.default_config: result.append('--default-config')
 
     # handle the parameterized args
-    if ns.checkout: result += ['--checkout', ns.checkout]
-    if ns.directory: result += ['--directory', ns.directory]
-    if ns.config_file: result += ['--config-file', config_file]
-    if ns.debug_file: result += ['--debug-file', debug_file]
+    if cc_parsed.checkout: result += ['--checkout', cc_parsed.checkout]
+    if cc_parsed.directory: result += ['--directory', cc_parsed.directory]
+    if cc_parsed.config_file: result += ['--config-file', config_file]
+    if cc_parsed.debug_file: result += ['--debug-file', debug_file]
 
     # add the (possibly updated) template param
-    if template is not None and not template.isspace():
-        result.append(template)
+    if cc_template is not None and not cc_template.isspace():
+        result.append(cc_template)
 
     # add any extra context
-    if extra is not None and len(extra) > 0:
-        result += extra
+    if cc_extra is not None and len(cc_extra) > 0:
+        result += cc_extra
 
-    return [quote_if_necessary(x) for x in result]
+    return quote_args(result)
 
 if __name__ == "__main__":
     # TODO: require that the commandline being passed in be of the form:
