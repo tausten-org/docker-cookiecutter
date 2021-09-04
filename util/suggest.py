@@ -1,3 +1,4 @@
+import os
 import sys
 import argparse
 
@@ -60,6 +61,7 @@ def prepare_cookiecutter_option_parser():
     parser.add_argument('--directory')
     parser.add_argument('--verbose', '-v', action='store_true')
     parser.add_argument('--replay', action='store_true')
+    parser.add_argument('--replay-file')
     parser.add_argument('--overwrite-if-exists', '-f', action='store_true')
     parser.add_argument('--skip-if-file-exists', '-s', action='store_true')
     parser.add_argument('--output-dir', '-o')
@@ -94,6 +96,9 @@ def quote_if_necessary(val):
 def quote_args(args):
     return [quote_if_necessary(x) for x in args]
 
+def get_root_basename(filepath):
+    return os.path.join("/", os.path.basename(filepath))
+
 def cookiecutter_to_docker_args(args):
     docker, cookiecutter = split_docker_from_cookiecutter(args)
 
@@ -116,14 +121,20 @@ def cookiecutter_to_docker_args(args):
     # volume mount for config-file
     config_file = None
     if cc_parsed.config_file:
-        config_file = "/user_cookiecutter_config.yml"
+        config_file = get_root_basename(cc_parsed.config_file)
         result += docker_v_args(cc_parsed.config_file, config_file)
     
     # volume mount for debug-file
     debug_file = None
     if cc_parsed.debug_file:
-        debug_file = "/cookiecutter_debug.log"
+        debug_file = get_root_basename(cc_parsed.debug_file)
         result += docker_v_args(cc_parsed.debug_file, debug_file)
+    
+    # volume mount for replay-file
+    replay_file = None
+    if cc_parsed.replay_file:
+        replay_file = get_root_basename(cc_parsed.replay_file)
+        result += docker_v_args(cc_parsed.replay_file, replay_file)
 
     # wrap up the docker portion with the image
     result += [ docker_image ]
@@ -143,6 +154,7 @@ def cookiecutter_to_docker_args(args):
     if cc_parsed.directory: result += ['--directory', cc_parsed.directory]
     if cc_parsed.config_file: result += ['--config-file', config_file]
     if cc_parsed.debug_file: result += ['--debug-file', debug_file]
+    if cc_parsed.replay_file: result += ['--replay-file', replay_file]
 
     # add the (possibly updated) template param
     if cc_template is not None and not cc_template.isspace():
