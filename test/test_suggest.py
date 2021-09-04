@@ -22,13 +22,13 @@ def test_split_docker_from_cookiecutter(given, want_docker, want_cookiecutter):
 
 @pytest.mark.parametrize(
     "given_host,given_container,want", [
-    pytest.param("/some/path", "/in", ["-v", "/some/path:/in"], id="normal"),
-    pytest.param('"$(pwd)"/stuff', "/in", ["-v", '"$(pwd)"/stuff:/in'], id="already has pwd"),
-    pytest.param("relative/path", "/out", ["-v", '"$(pwd)"/relative/path:/out'], id="relative path"),
-    pytest.param("./relative/path", "/jiggy", ["-v", '"$(pwd)"/./relative/path:/jiggy'], id="single dotted relative path"),
+    pytest.param("/some/path", "/in", ["--mount", "type=bind,source=/some/path,target=/in"], id="normal"),
+    pytest.param('"$(pwd)"/stuff', "/in", ["--mount", 'type=bind,source="$(pwd)"/stuff,target=/in'], id="already has pwd"),
+    pytest.param("relative/path", "/out", ["--mount", 'type=bind,source="$(pwd)"/relative/path,target=/out'], id="relative path"),
+    pytest.param("./relative/path", "/jiggy", ["--mount", 'type=bind,source="$(pwd)"/./relative/path,target=/jiggy'], id="single dotted relative path"),
 ])
-def test_docker_v_args(given_host, given_container, want):
-    got = suggest.docker_v_args(given_host, given_container)
+def test_docker_mount_args(given_host, given_container, want):
+    got = suggest.docker_mount_args(given_host, given_container)
     assert got == want
 
 some_image = "some-image:some-tag"
@@ -49,36 +49,36 @@ some_gh_template = "gh:audreyr/cookiecutter-pypackage"
     "given,want", [
     pytest.param(input_docker_preamble_expanded + [some_image, "cookiecutter", "-f", "-s"], 
         expected_docker_preamble 
-        + suggest.docker_v_args('"$(pwd)"', "/out") 
+        + suggest.docker_mount_args('"$(pwd)"', "/out") 
         + [some_image]
         + expected_cmd_preamble + ["--overwrite-if-exists", "--skip-if-file-exists"], 
     id="normal"),
 
     pytest.param(input_docker_preamble_base + [some_image, "cookiecutter", "-f", "-s"], 
         expected_docker_preamble 
-        + suggest.docker_v_args('"$(pwd)"', "/out") 
+        + suggest.docker_mount_args('"$(pwd)"', "/out") 
         + [some_image]
         + expected_cmd_preamble + ["--overwrite-if-exists", "--skip-if-file-exists"], 
     id="normal - input missing -it --rm"),
 
     pytest.param(input_docker_preamble_base + [some_image, "cookiecutter", some_gh_template], 
         expected_docker_preamble 
-        + suggest.docker_v_args('"$(pwd)"', "/out") 
+        + suggest.docker_mount_args('"$(pwd)"', "/out") 
         + [some_image]
         + expected_cmd_preamble + [some_gh_template], 
     id="simple gh"),
 
     pytest.param(input_docker_preamble_expanded + [some_image, "cookiecutter", "--verbose", "-o", "/some/path"], 
         expected_docker_preamble 
-        + suggest.docker_v_args("/some/path", "/out") 
+        + suggest.docker_mount_args("/some/path", "/out") 
         + [some_image]
         + expected_cmd_preamble + ["--verbose"], 
     id="-o maps to docker -v"),
 
     pytest.param(input_docker_preamble_expanded + [some_image, "cookiecutter", "-c", "the-branch", "/some/path"], 
         expected_docker_preamble 
-        + suggest.docker_v_args("/some/path", "/in") 
-        + suggest.docker_v_args('"$(pwd)"', "/out") 
+        + suggest.docker_mount_args("/some/path", "/in") 
+        + suggest.docker_mount_args('"$(pwd)"', "/out") 
         + [some_image]
         + expected_cmd_preamble + ["--checkout", "the-branch", "/in"], 
     id="local template maps to docker -v"),
