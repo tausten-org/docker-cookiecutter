@@ -5,6 +5,7 @@ import argparse
 docker_preamble = ["docker", "run", "-it", "--rm"]
 docker_user = ["--user", '"$(id -u):$(id -g)"']
 cookiecutter_cmd_and_preamble = ["cookiecutter", "-o", "/out"]
+cookiecutter_replay_file = "/.cookiecutter_replay/in.json"
 
 def split_docker_from_cookiecutter(given):
     got_docker = got_cookiecutter = []
@@ -131,11 +132,12 @@ def cookiecutter_to_docker_args(args):
         debug_file = get_root_basename(cc_parsed.debug_file)
         result += docker_mount_args(cc_parsed.debug_file, debug_file)
     
-    # volume mount for replay-file
-    replay_file = None
+    # volume mount for replay-file 
+    # This is a special case in that although cookiecutter docs indicate this is a supported
+    # commandline option, it doesn't appear to actually be supported in latest...  so we can
+    # fake it into existence by volume mount trickery knowing where the file ends up
     if cc_parsed.replay_file:
-        replay_file = get_root_basename(cc_parsed.replay_file)
-        result += docker_mount_args(cc_parsed.replay_file, replay_file)
+        result += docker_mount_args(cc_parsed.replay_file, cookiecutter_replay_file)
 
     # wrap up the docker portion with the image
     result += [ docker_image ]
@@ -155,7 +157,6 @@ def cookiecutter_to_docker_args(args):
     if cc_parsed.directory: result += ['--directory', cc_parsed.directory]
     if cc_parsed.config_file: result += ['--config-file', config_file]
     if cc_parsed.debug_file: result += ['--debug-file', debug_file]
-    if cc_parsed.replay_file: result += ['--replay-file', replay_file]
 
     # add the (possibly updated) template param
     if cc_template is not None and not cc_template.isspace():
@@ -168,7 +169,7 @@ def cookiecutter_to_docker_args(args):
     return quote_args(result)
 
 if __name__ == "__main__":
-    # TODO: require that the commandline being passed in be of the form:
+    # It is required that the commandline being passed in be of the form:
     #  {bunch of docker-related commandline args} {dockerImage} cookiecutter {cookiecutterArgs}
     #
     # in this way we can use the 'cookiecutter' as boundary between the two worlds, 
@@ -182,5 +183,4 @@ if __name__ == "__main__":
     #
     #  docker run -it --rm --user "$(id -u):$(id -g)" -v "$(pwd)":/out tausten/exp-cc:0.0.1 cookiecutter -o /out --overwrite-if-exists https://github.com/audreyfeldroy/cookiecutter-pypackage.git
     #
-
     sys.exit(" ".join(cookiecutter_to_docker_args(sys.argv[1:])))  # pragma: no cover
