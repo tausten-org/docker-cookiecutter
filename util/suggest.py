@@ -19,10 +19,11 @@ def split_docker_from_cookiecutter(given):
 
     return got_docker, got_cookiecutter
 
-def docker_v_args(host, container):
+def docker_mount_args(host, container):
     if host.startswith(".") or not host.startswith("/") and '$(pwd)' not in host:
         host = '"$(pwd)"/' + host
-    return ["-v", host + ":" + container]
+    # return ["-v", host + ":" + container]
+    return ["--mount", "type=bind,source=" + host + ",target=" + container]
 
 def is_fs_template(template):
     if template is None or template.isspace():
@@ -110,31 +111,31 @@ def cookiecutter_to_docker_args(args):
     # volume mount for template if it's a filesystem input
     if is_fs_template(cc_template):
         new_template = "/in"
-        result += docker_v_args(cc_template, new_template)
+        result += docker_mount_args(cc_template, new_template)
         cc_template = new_template
 
     # special handling of output - the preamble with always specify `-o /out`, and 
     # we just need to make sure we include the volume mount as needed
     host_output_folder = cc_parsed.output_dir if cc_parsed.output_dir else '"$(pwd)"'
-    result += docker_v_args(host_output_folder, "/out")
+    result += docker_mount_args(host_output_folder, "/out")
     
     # volume mount for config-file
     config_file = None
     if cc_parsed.config_file:
         config_file = get_root_basename(cc_parsed.config_file)
-        result += docker_v_args(cc_parsed.config_file, config_file)
+        result += docker_mount_args(cc_parsed.config_file, config_file)
     
     # volume mount for debug-file
     debug_file = None
     if cc_parsed.debug_file:
         debug_file = get_root_basename(cc_parsed.debug_file)
-        result += docker_v_args(cc_parsed.debug_file, debug_file)
+        result += docker_mount_args(cc_parsed.debug_file, debug_file)
     
     # volume mount for replay-file
     replay_file = None
     if cc_parsed.replay_file:
         replay_file = get_root_basename(cc_parsed.replay_file)
-        result += docker_v_args(cc_parsed.replay_file, replay_file)
+        result += docker_mount_args(cc_parsed.replay_file, replay_file)
 
     # wrap up the docker portion with the image
     result += [ docker_image ]

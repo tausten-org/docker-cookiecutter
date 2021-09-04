@@ -42,10 +42,10 @@ At the basic level, these are the necessary steps to leverage the container succ
 4. Pre-create local output target (if it doesn't already exist)
    - eg. `mkdir -p /tmp/out`
 5. Prepare the `docker run` portion of the command execution:
-   - eg. `docker run -it --rm --user "$(id -u):$(id -g)" -v /tmp/out:/tmp/out tausten/docker-cookiecutter:latest`
+   - eg. `docker run -it --rm --user "$(id -u):$(id -g)" --mount type=bind,source=/tmp/out,target=/tmp/out tausten/docker-cookiecutter:latest`
    - NOTE: the `--user` is very important in order for the output to have the correct ownership
 6. Combine the two together and execute:
-   - eg. `docker run -it --rm --user "$(id -u):$(id -g)" -v /tmp/out:/tmp/out tausten/docker-cookiecutter:latest cookiecutter -o /tmp/out -f https://github.com/BruceEckel/HelloCookieCutter1`
+   - eg. `docker run -it --rm --user "$(id -u):$(id -g)" --mount type=bind,source=/tmp/out,target=/tmp/out tausten/docker-cookiecutter:latest cookiecutter -o /tmp/out -f https://github.com/BruceEckel/HelloCookieCutter1`
 
 ### Usage (suggest)
 
@@ -56,7 +56,7 @@ For help in coming up with the full docker commandline, you can lean on the `sug
 2. Execute the `suggest` script with this whole simplified commandline as input:
    - eg. `docker run -it --rm tausten/docker-cookiecutter:latest suggest docker run tausten/docker-cookiecutter:latest cookiecutter -o /tmp/out -f /some/local/template`
 3. Look over the suggested commandline that is returned, make any adjustments you see fit, then execute that
-   - eg. `docker run -it --rm --user "$(id -u):$(id -g)" -v /some/local/template:/in -v /tmp/out:/out tausten/docker-cookiecutter:latest cookiecutter -o /out --overwrite-if-exists /in`
+   - eg. `docker run -it --rm --user "$(id -u):$(id -g)" --mount type=bind,source=/some/local/template,target=/in --mount type=bind,source=/tmp/out,target=/out tausten/docker-cookiecutter:latest cookiecutter -o /out --overwrite-if-exists /in`
 
 ### Examples
 
@@ -77,7 +77,7 @@ Here are some simple examples based on the [Cookiecutter Docs](https://cookiecut
 > docker run -it --rm tausten/docker-cookiecutter:latest suggest docker run tausten/docker-cookiecutter:latest cookiecutter cookiecutter-pypackage/
 
 # Review the returned suggestion:
-docker run -it --rm --user "$(id -u):$(id -g)" -v "$(pwd)"/cookiecutter-pypackage/:/in -v "$(pwd)":/out tausten/docker-cookiecutter:latest cookiecutter -o /out /in
+docker run -it --rm --user "$(id -u):$(id -g)" --mount type=bind,source="$(pwd)"/cookiecutter-pypackage/,target=/in --mount type=bind,source="$(pwd)",target=/out tausten/docker-cookiecutter:latest cookiecutter -o /out /in
 
 # If it looks good, go ahead and execute it..  otherwise, make your desired adjustments then proceed.
 ```
