@@ -73,7 +73,7 @@ some_gh_template = "gh:audreyr/cookiecutter-pypackage"
         + suggest.docker_mount_args("/some/path", "/out") 
         + [some_image]
         + expected_cmd_preamble + ["--verbose"], 
-    id="-o maps to docker -v"),
+    id="-o maps to docker --mount"),
 
     pytest.param(input_docker_preamble_expanded + [some_image, "cookiecutter", "-c", "the-branch", "/some/path"], 
         expected_docker_preamble 
@@ -81,7 +81,16 @@ some_gh_template = "gh:audreyr/cookiecutter-pypackage"
         + suggest.docker_mount_args('"$(pwd)"', "/out") 
         + [some_image]
         + expected_cmd_preamble + ["--checkout", "the-branch", "/in"], 
-    id="local template maps to docker -v"),
+    id="local template maps to docker --mount"),
+
+    pytest.param(input_docker_preamble_expanded + [some_image, "cookiecutters", "a,,b"], 
+        expected_docker_preamble 
+        + suggest.docker_mount_args("a", "/in-0") 
+        + suggest.docker_mount_args("b", "/in-1") 
+        + suggest.docker_mount_args('"$(pwd)"', "/out") 
+        + [some_image]
+        + ["cookiecutters"] + expected_o + ["/in-0,,/in-1"], 
+    id="cookiecutters - local templates map to docker --mounts"),
 ])
 def test_cookiecutter_to_docker_args(given, want):
     got = suggest.cookiecutter_to_docker_args(given)

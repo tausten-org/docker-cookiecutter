@@ -19,6 +19,6 @@ from util import templates
         templates.TemplateSourceInfo("c", directory="cdir")], 
         id="multi - mix"),
 ])
-def test_parse_template_sources(given, want):
-    got = templates.parse_template_sources(given)
+def test_decode_template_sources(given, want):
+    got = templates.decode_template_sources(given)
     assert got == want

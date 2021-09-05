@@ -1,17 +1,29 @@
 import os
 import sys
 import argparse
+from util.templates import TemplateSourceInfo, decode_template_sources, encode_template_sources
 
-docker_preamble = ["docker", "run", "-it", "--rm"]
-docker_user = ["--user", '"$(id -u):$(id -g)"']
-cookiecutter_cmd_and_preamble = ["cookiecutter", "-o", "/out"]
-cookiecutter_replay_file = "/.cookiecutter_replay/in.json"
+# Work around python's lack of consts
+class CONST(object):
+    __slots__ = ()
+    DOCKER_PREAMBLE = ["docker", "run", "-it", "--rm"]
+    DOCKER_USER = ["--user", '"$(id -u):$(id -g)"']
+    DOCKER_ARGS_TO_PRUNE = DOCKER_PREAMBLE + ["-i", "-t"]
+    CC = "cookiecutter"
+    CCS = "cookiecutters"
+    CC_OUT = ["-o", "/out"]
+    CC_CMD_AND_PREAMBLE = [CC] + CC_OUT
+    CCS_CMD_AND_PREAMBLE = [CCS] + CC_OUT
+    CC_REPLAY_FILE = "/.cookiecutter_replay/in.json"
+CONST = CONST()
+
+
 
 def split_docker_from_cookiecutter(given):
     got_docker = got_cookiecutter = []
     
     for i, v in enumerate(given):
-        if v == "cookiecutter":
+        if v == CONST.CC or v == CONST.CCS:
             got_docker = given[:i]
             got_cookiecutter = given[i:]
             break
@@ -42,14 +54,12 @@ def is_fs_template(template):
     
     return True
 
-docker_args_to_prune = docker_preamble + ["-i", "-t"]
-
 def parse_docker(args):
     # TODO: split things out better (i.e. handle any conflicting volume mounts)
     image = args[-1]
 
     # hacky pruning of the --rm and -it because we'll add them back explicitly later
-    extra = [x for x in args[:-1] if x not in docker_args_to_prune]
+    extra = [x for x in args[:-1] if x not in CONST.DOCKER_ARGS_TO_PRUNE]
 
     return [], image, extra
 
@@ -106,14 +116,24 @@ def cookiecutter_to_docker_args(args):
 
     _, docker_image, docker_extra = parse_docker(docker[1:])
     cc_parsed, cc_template, cc_extra = parse_cookiecutter(cookiecutter[1:])
+    cc_templates = decode_template_sources(cc_template)
+    new_templates = []
 
-    result = docker_preamble + docker_extra + docker_user
+    result = CONST.DOCKER_PREAMBLE + docker_extra + CONST.DOCKER_USER
 
-    # volume mount for template if it's a filesystem input
-    if is_fs_template(cc_template):
-        new_template = "/in"
-        result += docker_mount_args(cc_template, new_template)
-        cc_template = new_template
+    for i, t in enumerate(cc_templates):
+        # volume mount for template if it's a filesystem input
+        if is_fs_template(cc_template):
+            new_template = "/in"
+            if len(cc_templates) > 1:
+                new_template += f"-{i}"
+            
+            result += docker_mount_args(t.template, new_template)
+            new_templates.append(TemplateSourceInfo(new_template))
+        else:
+            new_templates.append(t)
+
+    cc_template = encode_template_sources(new_templates)
 
     # special handling of output - the preamble with always specify `-o /out`, and 
     # we just need to make sure we include the volume mount as needed
@@ -137,12 +157,12 @@ def cookiecutter_to_docker_args(args):
     # commandline option, it doesn't appear to actually be supported in latest...  so we can
     # fake it into existence by volume mount trickery knowing where the file ends up
     if cc_parsed.replay_file:
-        result += docker_mount_args(cc_parsed.replay_file, cookiecutter_replay_file)
+        result += docker_mount_args(cc_parsed.replay_file, CONST.CC_REPLAY_FILE)
 
     # wrap up the docker portion with the image
     result += [ docker_image ]
 
-    result += cookiecutter_cmd_and_preamble
+    result += CONST.CC_CMD_AND_PREAMBLE if len(cc_templates) < 2 else CONST.CCS_CMD_AND_PREAMBLE
 
     # Handle all the flag args
     if cc_parsed.no_input: result.append('--no-input')
@@ -159,7 +179,7 @@ def cookiecutter_to_docker_args(args):
     if cc_parsed.debug_file: result += ['--debug-file', debug_file]
 
     # add the (possibly updated) template param
-    if cc_template is not None and not cc_template.isspace():
+    if cc_template is not None and len(cc_template) > 0 and  not cc_template.isspace():
         result.append(cc_template)
 
     # add any extra context
