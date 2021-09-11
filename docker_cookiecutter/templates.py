@@ -2,16 +2,15 @@ from dataclasses import dataclass
 from typing import AnyStr
 
 
-"""Gather complete set of information about the template source.
-
-template - the base uri of the template (eg. directory, or repository address)
-checkout - [optional] - branch, tag or commit within the repo
-directory - [optional] - directory within the repo
-"""
-
-
 @dataclass
 class TemplateSourceInfo:
+    """Gather complete set of information about the template source.
+
+    template - the base uri of the template (eg. directory, or repository address)
+    checkout - [optional] - branch, tag or commit within the repo
+    directory - [optional] - directory within the repo
+    """
+
     template: AnyStr
     checkout: AnyStr = None
     directory: AnyStr = None
