@@ -1,6 +1,6 @@
 import pytest
 
-from util import templates
+from docker_cookiecutter import templates
 
 @pytest.mark.parametrize(
     "given,want", [

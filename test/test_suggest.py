@@ -1,6 +1,6 @@
 import pytest
 
-from util import suggest
+from docker_cookiecutter import suggest
 
 def split_to_args(args_string):
     return args_string.split()

@@ -28,6 +28,7 @@
 		// Python dev-specific
 		"ms-python.python",
 		"ms-python.vscode-pylance",
+		"tamasfe.even-better-toml",
 		
 		// Dev workflow / extras
 		"vivaxy.vscode-conventional-commits",

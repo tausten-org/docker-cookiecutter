@@ -1,7 +1,7 @@
 import os
 import sys
 import argparse
-from util.templates import TemplateSourceInfo, decode_template_sources, encode_template_sources
+from docker_cookiecutter.templates import TemplateSourceInfo, decode_template_sources, encode_template_sources
 
 # Work around python's lack of consts
 class CONST(object):
@@ -16,8 +16,6 @@ class CONST(object):
     CCS_CMD_AND_PREAMBLE = [CCS] + CC_OUT
     CC_REPLAY_FILE = "/.cookiecutter_replay/in.json"
 CONST = CONST()
-
-
 
 def split_docker_from_cookiecutter(given):
     got_docker = got_cookiecutter = []

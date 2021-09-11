@@ -19,7 +19,7 @@ RUN mkdir -p /.cookiecutter_replay \
 
 WORKDIR /app
 COPY ./entrypoint.sh /entrypoint.sh
-COPY ./util/suggest.py /util/suggest.py
+COPY ./util/*.py /util/
 
 ENTRYPOINT [ "/entrypoint.sh" ]
 CMD [ "cookiecutter", "--help" ]
