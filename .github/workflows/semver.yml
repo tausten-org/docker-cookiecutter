@@ -19,6 +19,7 @@ jobs:
           github_token: ${{ Secrets.GH_TOKEN }}
           release_branches: main,release*,hotfix*
           pre_release_branches: ^(?!main|release|hotfix).+
+
       - name: Create a GitHub release
         uses: actions/create-release@v1
         env:
@@ -27,4 +28,3 @@ jobs:
           tag_name: ${{ steps.tag_version.outputs.new_tag }}
           release_name: Release ${{ steps.tag_version.outputs.new_tag }}
           body: ${{ steps.tag_version.outputs.changelog }}
-

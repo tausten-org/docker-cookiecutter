@@ -16,7 +16,7 @@ run.detached:
 test: run.detached test.unit test.integration
 
 test.unit: run.detached
-	$(DOCKER_COMPOSE_EXEC) pytest test/
+	$(DOCKER_COMPOSE_EXEC) tox
 
 test.integration: run.detached
 	$(DOCKER_COMPOSE_EXEC) echo TODO: Integration tests go here...

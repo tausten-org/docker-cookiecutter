@@ -11,6 +11,11 @@ RUN apk --update add git less openssh mercurial && \
     rm -rf /var/lib/apt/lists/* && \
     rm /var/cache/apk/*
 
+# Install the custom python package from source
+COPY . /tmp/pypackage/
+RUN pip3 install /tmp/pypackage \
+    && rm -rf /tmp/pypackage
+
 RUN mkdir -p /.cookiecutters/ \
     && chmod 777 /.cookiecutters
 
@@ -19,7 +24,6 @@ RUN mkdir -p /.cookiecutter_replay \
 
 WORKDIR /app
 COPY ./entrypoint.sh /entrypoint.sh
-COPY ./util/*.py /util/
 
 ENTRYPOINT [ "/entrypoint.sh" ]
 CMD [ "cookiecutter", "--help" ]
