@@ -60,6 +60,7 @@ test = [
 dev = ["tox", "pre-commit", "virtualenv", "pip", "twine", "toml"]
 
 doc = [
+    "livereload",
     "mkdocs",
     "mkdocs-include-markdown-plugin",
     "mkdocs-material",
