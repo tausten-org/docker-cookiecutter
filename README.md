@@ -66,15 +66,15 @@ Here are some simple examples based on the [Cookiecutter Docs](https://cookiecut
 
 ```sh
 # in general, you can execute cookiecutter commands as you normally would, with the caveat that any local filesystem-based resources need special attention as described previously
-> docker run -it --rm tausten/docker-cookiecutter:latest cookiecutter --version
-> docker run -it --rm tausten/docker-cookiecutter:latest cookiecutter --help
+$ docker run -it --rm tausten/docker-cookiecutter:latest cookiecutter --version
+$ docker run -it --rm tausten/docker-cookiecutter:latest cookiecutter --help
 ```
 
 - Simple local template example - `cookiecutter cookiecutter-pypackage/`
 
 ```sh
 # Get suggestion for how to execute your desired command
-> docker run -it --rm tausten/docker-cookiecutter:latest suggest docker run tausten/docker-cookiecutter:latest cookiecutter cookiecutter-pypackage/
+$ docker run -it --rm tausten/docker-cookiecutter:latest suggest docker run tausten/docker-cookiecutter:latest cookiecutter cookiecutter-pypackage/
 
 # Review the returned suggestion:
 docker run -it --rm --user "$(id -u):$(id -g)" --mount type=bind,source="$(pwd)"/cookiecutter-pypackage/,target=/in --mount type=bind,source="$(pwd)",target=/out tausten/docker-cookiecutter:latest cookiecutter -o /out /in
@@ -92,7 +92,7 @@ If you're a developer, feel free to clone/fork the repo and submit PR requests. 
 
 ### Testing
 
-Testing is done with pytest, and tests are gathered under the `test` folder. You can execute the tests via the makefile with `make test.unit`, `make test.integration`, or `make test` (which will execute any unit and integration tests).
+Testing is done with pytest, and tests are gathered under the `tests` folder. You can execute the tests via the makefile with `make test.unit`, `make test.integration`, or `make test` (which will execute any unit and integration tests).
 
 ### CI/CD
 
@@ -112,3 +112,4 @@ Special thanks to the maintainers of the following resources that were used duri
 
 - [docker](https://www.docker.com/) - container tech
 - [cookiecutter](https://github.com/cookiecutter/cookiecutter) - the excellent original project template support
+- [Python Project Wizard](https://zillionare.github.io/cookiecutter-pypackage/) - a cookiecutter template for setting up python projects
