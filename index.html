@@ -775,8 +775,8 @@
 <table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span>
 <span class="normal">2</span>
 <span class="normal">3</span></pre></div></td><td class="code"><div class="highlight"><pre><span></span><code><span class="c1"># in general, you can execute cookiecutter commands as you normally would, with the caveat that any local filesystem-based resources need special attention as described previously</span>
-&gt; docker run -it --rm tausten/docker-cookiecutter:latest cookiecutter --version
-&gt; docker run -it --rm tausten/docker-cookiecutter:latest cookiecutter --help
+$ docker run -it --rm tausten/docker-cookiecutter:latest cookiecutter --version
+$ docker run -it --rm tausten/docker-cookiecutter:latest cookiecutter --help
 </code></pre></div>
 </td></tr></table>
 <ul>
@@ -789,7 +789,7 @@
 <span class="normal">5</span>
 <span class="normal">6</span>
 <span class="normal">7</span></pre></div></td><td class="code"><div class="highlight"><pre><span></span><code><span class="c1"># Get suggestion for how to execute your desired command</span>
-&gt; docker run -it --rm tausten/docker-cookiecutter:latest suggest docker run tausten/docker-cookiecutter:latest cookiecutter cookiecutter-pypackage/
+$ docker run -it --rm tausten/docker-cookiecutter:latest suggest docker run tausten/docker-cookiecutter:latest cookiecutter cookiecutter-pypackage/
 
 <span class="c1"># Review the returned suggestion:</span>
 docker run -it --rm --user <span class="s2">&quot;</span><span class="k">$(</span>id -u<span class="k">)</span><span class="s2">:</span><span class="k">$(</span>id -g<span class="k">)</span><span class="s2">&quot;</span> --mount <span class="nv">type</span><span class="o">=</span>bind,source<span class="o">=</span><span class="s2">&quot;</span><span class="k">$(</span><span class="nb">pwd</span><span class="k">)</span><span class="s2">&quot;</span>/cookiecutter-pypackage/,target<span class="o">=</span>/in --mount <span class="nv">type</span><span class="o">=</span>bind,source<span class="o">=</span><span class="s2">&quot;</span><span class="k">$(</span><span class="nb">pwd</span><span class="k">)</span><span class="s2">&quot;</span>,target<span class="o">=</span>/out tausten/docker-cookiecutter:latest cookiecutter -o /out /in
@@ -802,7 +802,7 @@ docker run -it --rm --user <span class="s2">&quot;</span><span class="k">$(</spa
 <h4 id="contributing">Contributing<a class="headerlink" href="#contributing" title="Permanent link">&para;</a></h4>
 <p>If you're a developer, feel free to clone/fork the repo and submit PR requests. Please include at least one unit test covering the bug, and showing that your fix addresses the problem.</p>
 <h4 id="testing">Testing<a class="headerlink" href="#testing" title="Permanent link">&para;</a></h4>
-<p>Testing is done with pytest, and tests are gathered under the <code>test</code> folder. You can execute the tests via the makefile with <code>make test.unit</code>, <code>make test.integration</code>, or <code>make test</code> (which will execute any unit and integration tests).</p>
+<p>Testing is done with pytest, and tests are gathered under the <code>tests</code> folder. You can execute the tests via the makefile with <code>make test.unit</code>, <code>make test.integration</code>, or <code>make test</code> (which will execute any unit and integration tests).</p>
 <h4 id="cicd">CI/CD<a class="headerlink" href="#cicd" title="Permanent link">&para;</a></h4>
 <p>This repo itself leverages github actions to perform basic CI/CD for maintainance. The repo is set up as a python (+ vscode devcontainer) development and uses pytest for testing.</p>
 <h4 id="support">Support<a class="headerlink" href="#support" title="Permanent link">&para;</a></h4>
@@ -814,6 +814,7 @@ docker run -it --rm --user <span class="s2">&quot;</span><span class="k">$(</spa
 <ul>
 <li><a href="https://www.docker.com/">docker</a> - container tech</li>
 <li><a href="https://github.com/cookiecutter/cookiecutter">cookiecutter</a> - the excellent original project template support</li>
+<li><a href="https://zillionare.github.io/cookiecutter-pypackage/">Python Project Wizard</a> - a cookiecutter template for setting up python projects</li>
 </ul>
 <!-- END INCLUDE -->
                 
