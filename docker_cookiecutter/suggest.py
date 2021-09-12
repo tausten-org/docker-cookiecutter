@@ -142,7 +142,7 @@ def cookiecutter_to_docker_args(args):
 
     for i, t in enumerate(cc_templates):
         # volume mount for template if it's a filesystem input
-        if is_fs_template(cc_template):
+        if is_fs_template(t.template):
             new_template = "/in"
             if len(cc_templates) > 1:
                 new_template += f"-{i}"
