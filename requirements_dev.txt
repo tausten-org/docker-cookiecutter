@@ -1,3 +1,11 @@
-cookiecutter == 1.*
-pytest == 6.2.4
 argparse == 1.4.0
+virtualenv>=16.6.0
+pip>=19.1.1
+setuptools>=18.0.1
+six>=1.14.0
+tox>=3.24.0
+cookiecutter==1.*
+poetry>=1.1.8
+livereload>=2.6.3
+pytest>=6.2.5
+pre-commit>=2.12.0

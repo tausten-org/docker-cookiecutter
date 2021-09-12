@@ -1,5 +1,6 @@
 name: ci
 
+# Controls when the action will run.
 on:
   pull_request:
     branches:
@@ -7,10 +8,67 @@ on:
       - release*
       - hotfix*
 
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
 jobs:
   test:
+    strategy:
+      matrix:
+        python-versions: [3.6, 3.7, 3.8, 3.9]
+        os: [ubuntu-18.04, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-versions }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install poetry tox tox-gh-actions
+
+      - name: test with tox
+        run:
+          tox
+
+      - name: list files
+        run: ls -l .
+
+  test_integration:
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - name: Run the tests
-        run: make test
+      - name: Run the integration tests
+        run: make test.integration
+
+  publish_dev_build:
+    # if test failed, we should not publish coverage
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+        with:
+          python-version: 3.9
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install poetry tox tox-gh-actions
+
+      - name: test with tox
+        run:
+          tox
+
+      - name: list files
+        run: ls -l .
+
+# TODO: If we want codecov integration, feel free to hook in here
+      # - uses: codecov/codecov-action@v1
+      #   with:
+      #     fail_ci_if_error: true
+      #     files: coverage.xml
