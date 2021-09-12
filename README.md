@@ -112,4 +112,5 @@ Special thanks to the maintainers of the following resources that were used duri
 
 - [docker](https://www.docker.com/) - container tech
 - [cookiecutter](https://github.com/cookiecutter/cookiecutter) - the excellent original project template support
+- [pytest-cookies](https://github.com/hackebrot/pytest-cookies) - fixture for simpler testing of cookiecutters
 - [Python Project Wizard](https://zillionare.github.io/cookiecutter-pypackage/) - a cookiecutter template for setting up python projects

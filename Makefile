@@ -17,7 +17,7 @@ run.detached:
 test: run.detached test.unit test.integration
 
 test.unit: run.detached
-	$(DOCKER_COMPOSE_EXEC) tox -e py39,lint,format
+	$(DOCKER_COMPOSE_EXEC) tox -r -e py39,lint,format
 
 test.integration: run.detached
 	$(DOCKER_COMPOSE_EXEC) echo TODO: Integration tests go here...
