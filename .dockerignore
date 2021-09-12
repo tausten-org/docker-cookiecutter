@@ -1,1 +1,10 @@
-# TODO: Exclude things here
+.github
+.pytest*
+dist
+site
+**/__pycache__
+.tox
+.vscode
+docs
+tests
+coverage.xml
