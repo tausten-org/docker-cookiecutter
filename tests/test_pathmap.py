@@ -77,8 +77,8 @@ def test_parse_parent_child(given, want_parent, want_child):
     "given,want",
     [
         pytest.param("a", "a", id="trivial"),
-        pytest.param("a/", "a/", id="trailing - linux"),
-        pytest.param("a\\", "a/", id="trailing - windows"),
+        pytest.param("a/", "a", id="trailing - linux"),
+        pytest.param("a\\", "a", id="trailing - windows"),
         pytest.param("/", "/", id="root - linux"),
         pytest.param("///", "/", id="root - repeated - linux"),
         pytest.param("c:\\", "/", id="root - windows"),
@@ -96,6 +96,15 @@ def test_transform_to_nix_path(given, want):
     "given_paths,want_map",
     [
         pytest.param(["/a"], {"/a": "/h/a"}, id="trivial"),
+        pytest.param(
+            ["/a/b/", "/c", "c:\\d"],
+            {
+                "/a/b/": "/h/a/b",
+                "/c": "/h/c",
+                "c:\\d": "/h/d",
+            },
+            id="multiple - absolute",
+        ),
     ],
 )
 def test_map_host_to_container(given_paths, want_map):

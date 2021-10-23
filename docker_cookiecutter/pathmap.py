@@ -42,6 +42,9 @@ def transform_to_nix_path(candidate):
     if drive_sep_pos >= 0:
         norm = norm[drive_sep_pos + 1 :]
 
+    # Let's trim trailing slash (unless it's root)
+    norm = norm if len(norm) <= 1 else norm.rstrip(PATH_SEP_CHARS)
+
     return norm
 
 
@@ -124,10 +127,10 @@ def map_host_to_container(host_paths, container_root_target):
     min_mounts = reduce_mounts(host_paths)
     map_host_to_container_paths = {}
 
-    for mount in min_mounts:
-        container_path = transform_to_nix_path(mount)
+    for path in host_paths:
+        container_path = transform_to_nix_path(path)
         if container_path.startswith("/"):
             container_path = container_root_target + container_path
-        map_host_to_container_paths[mount] = container_path
+        map_host_to_container_paths[path] = container_path
 
     return min_mounts, map_host_to_container_paths
