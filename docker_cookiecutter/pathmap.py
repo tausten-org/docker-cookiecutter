@@ -2,11 +2,17 @@ import re
 
 PATH_SEP_CHARS = "/\\"
 
-# Regex to detect groups of repeated separator-like chars, and pull out the first char as a capture group
-CONSECUTIVE_UNKNOWN_SEP_CHARS_REGEX = re.compile(r"([/\\])(?:[/\\]+)")
+# Regex to detect groups of repeated separator-like chars, and pull out the first char as a
+# capture group
+REPETITION_OF_UNKNOWN_SEP_CHARS_REGEX = re.compile(r"([/\\])(?:[/\\]+)")
 
-# Regex to split a path (of unkown origin - windows or linux) into (parent, sep, child) groups
-UNKNOWN_PATH_TYPE_SPLIT_REGEX = re.compile(r"^(.*[/\\]+)([^/\\]+[/\\]*)$")
+# Regex for finding separators
+UNKNOWN_SEP_CHARS_REGEX = re.compile(r"[/\\]+")
+
+# Regex to split a path (of unkown origin - windows or linux) into (parent, child) groups
+UNKNOWN_PATH_TYPE_SPLIT_TO_PARENT_AND_CHILD_REGEX = re.compile(
+    r"^(?P<parent>.*[/\\]+)(?P<child>[^/\\]+[/\\]*)?$"
+)
 
 
 def normalize_path(candidate):
@@ -14,7 +20,7 @@ def normalize_path(candidate):
     Path origin is unknown, but we wish to collapse consecutive separators down to singles
     and trim any final trailing separator (but only if the path is not for "root" folder)
     """
-    norm = CONSECUTIVE_UNKNOWN_SEP_CHARS_REGEX.sub(r"\1", candidate).rstrip(
+    norm = REPETITION_OF_UNKNOWN_SEP_CHARS_REGEX.sub(r"\1", candidate).rstrip(
         PATH_SEP_CHARS
     )
 
@@ -25,21 +31,38 @@ def normalize_path(candidate):
     return norm
 
 
+def transform_to_nix_path(candidate):
+    """
+    Path origin is unknown, but we wish to transform it to a comparable *nix path
+    """
+    norm = UNKNOWN_SEP_CHARS_REGEX.sub("/", candidate)
+
+    # Special case - let's strip off any windowsy drive letter preamble
+    drive_sep_pos = norm.find(":")
+    if drive_sep_pos >= 0:
+        norm = norm[drive_sep_pos + 1 :]
+
+    return norm
+
+
 def reduce_mounts(inputs):
     """
     Given a set of input paths intended to be mounted, reduce this to the subset that need mounting.
     (eg. avoid mounting children of folders already being mounted).
     """
-    explicit_mounts = set([normalize_path(x) for x in inputs])
     has_mount_or_parent_mount = {}
     reduced_mounts = []
 
-    for mount in explicit_mounts:
-        parent, _ = parse_parent_child(mount)
+    for mount in inputs:
+        parent, child = parse_parent_child(mount)
+        is_root = parent is None
+        # if we're mounting a folder other than root, we should strip trailing separators
+        parent_trimmed = parent.rstrip(PATH_SEP_CHARS) if not is_root else None
         if not has_mount_or_parent_mount_recurse(
-            parent, explicit_mounts, has_mount_or_parent_mount
+            parent_trimmed, reduced_mounts, has_mount_or_parent_mount
         ):
-            reduced_mounts.append(mount)
+            candidate = mount.rstrip(PATH_SEP_CHARS) if not is_root else child
+            reduced_mounts.append(candidate)
 
     return reduced_mounts
 
@@ -60,13 +83,12 @@ def has_mount_or_parent_mount_recurse(
         status = True
     else:
         parent, _ = parse_parent_child(candidate)
-        status = has_mount_or_parent_mount_recurse(
-            parent, explicit_mounts, has_mount_or_parent_mount_map
-        ) or has_mount_or_parent_mount_recurse(
-            parent.rstrip(PATH_SEP_CHARS),
-            explicit_mounts,
-            has_mount_or_parent_mount_map,
-        )
+        if parent is None:
+            status = False
+        else:
+            status = has_mount_or_parent_mount_recurse(
+                parent, explicit_mounts, has_mount_or_parent_mount_map
+            )
 
     # Store in the memo and return
     has_mount_or_parent_mount_map[candidate] = status
@@ -74,8 +96,35 @@ def has_mount_or_parent_mount_recurse(
 
 
 def parse_parent_child(mount):
-    match = UNKNOWN_PATH_TYPE_SPLIT_REGEX.match(mount)
+    mount_trimmed = mount.rstrip(PATH_SEP_CHARS)
+    match = UNKNOWN_PATH_TYPE_SPLIT_TO_PARENT_AND_CHILD_REGEX.match(mount_trimmed)
     if match is None:
         return None, mount
 
-    return match.group(0), match.group(1)
+    # strip away trailing slash on parent
+    parent = match.group("parent")
+    if parent is not None:
+        parent_trimmed = parent.rstrip(PATH_SEP_CHARS)
+        # deal with the "root" folder - we don't want to strip that slash
+        if len(parent_trimmed) > 0 and not parent_trimmed.endswith(":"):
+            parent = parent_trimmed
+
+    return parent, match.group("child")
+
+
+def map_host_to_container(host_paths, container_root_target):
+    """
+    Takes a set of host paths, and computes the list of host paths needing mounting, and
+    a mapping of all related host_paths (those explicitly provided, and those needing mounting)
+    to container paths.
+    """
+    min_mounts = reduce_mounts(host_paths)
+    map_host_to_container_paths = {}
+
+    for mount in min_mounts:
+        container_path = transform_to_nix_path(mount)
+        if container_path.startswith("/"):
+            container_path = container_root_target + container_path
+        map_host_to_container_paths[mount] = container_path
+
+    return min_mounts, map_host_to_container_paths
