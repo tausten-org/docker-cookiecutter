@@ -53,6 +53,9 @@ def reduce_mounts(inputs):
     has_mount_or_parent_mount = {}
     reduced_mounts = []
 
+    # make sure our inputs are sorted so that we get to parents before children
+    inputs.sort()
+
     for mount in inputs:
         parent, child = parse_parent_child(mount)
         is_root = parent is None

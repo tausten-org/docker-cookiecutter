@@ -15,6 +15,11 @@ from docker_cookiecutter import pathmap
         pytest.param(
             ["a", "a/b/c"], ["a"], id="multi - mounting both parent and indirect child"
         ),
+        pytest.param(
+            ["a/b", "a"],
+            ["a"],
+            id="multi - mounting both parent and child - out of order",
+        ),
     ],
 )
 def test_reduce_mounts(given, want):
