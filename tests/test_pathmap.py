@@ -111,5 +111,8 @@ def test_map_host_to_container(given_paths, want_map):
 
     mounts, mapping = pathmap.map_host_to_container(given_paths, "/h")
 
-    assert mounts is not None
+    mapping_keys = mapping.keys()
+    for mount_host in mounts:
+        assert mount_host in mapping_keys, "reduced mounts should have mappings"
+
     assert mapping == want_map
