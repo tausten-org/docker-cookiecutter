@@ -129,7 +129,7 @@ def get_root_basename(filepath):
     return os.path.join("/", os.path.basename(filepath))
 
 
-def cookiecutter_to_docker_args(args):
+def cookiecutter_to_docker_args(args, abs="/h/abs", rel="/h/rel"):
     docker, cookiecutter = split_docker_from_cookiecutter(args)
 
     _, docker_image, docker_extra = parse_docker(docker[1:])

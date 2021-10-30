@@ -168,7 +168,57 @@ some_gh_template = "gh:audreyr/cookiecutter-pypackage"
         ),
     ],
 )
-def test_cookiecutter_to_docker_args(given, want):
+def test_cookiecutter_to_docker_args_list(given, want):
     got = suggest.cookiecutter_to_docker_args(given)
 
     assert got == want
+
+
+@pytest.mark.parametrize(
+    "given_cookiecutter,want_cookiecutter,want_mounts",
+    [
+        pytest.param(
+            "cookiecutter -o /output/folder /some/path/someTemplate",
+            "cookiecutter -o /h/abs/output/folder /h/abs/some/path/someTemplate",
+            [
+                '--mount type=bind,source="/output/folder",target="/h/abs/output/folder"',
+                '--mount type=bind,source="/some/path/someTemplate",target="/h/abs/some/path/someTemplate"',
+            ],
+            id="absolute - simple",
+        ),
+        pytest.param(
+            "cookiecutter some/path/someTemplate",
+            "cookiecutter -o /h/rel/wd /h/rel/wd/some/path/someTemplate",
+            [
+                '--mount type=bind,source="$(pwd)",target="/h/rel/wd"',
+            ],
+            id="relative - wd and below",
+        ),
+        pytest.param(
+            "cookiecutter -o ../../output ../../../some/path/someTemplate",
+            "cookiecutter -o /h/rel/dd/dd/dd/wd/../../output /h/rel/dd/dd/dd/wd/../../../some/path/someTemplate",
+            [
+                '--mount type=bind,source="$(pwd)/../../output",target="/h/rel/dd/dd/dd/wd/../../output"',
+                '--mount type=bind,source="$(pwd)/../../../some/path/someTemplate",target="/h/rel/dd/dd/dd/wd/../../../some/path/someTemplate"',
+            ],
+            id="relative - above wd - does not collapse dotted relations",
+        ),
+    ],
+)
+def test_cookiecutter_to_docker_args_paths(
+    given_cookiecutter, want_cookiecutter, want_mounts
+):
+    # given
+    given_args = (
+        "docker run -it --rm tausten/docker-cookiecutter:latest " + given_cookiecutter
+    )
+    split_given_args = given_args.split()
+
+    # when
+    got = suggest.cookiecutter_to_docker_args(split_given_args)
+    got_cookiecutter = " ".join(got[got.index("cookiecutter") :])
+    got_mounts = [arg for arg in got if arg.startswith("--mount")]
+
+    # then
+    assert got_cookiecutter == want_cookiecutter
+    assert got_mounts == want_mounts

@@ -1,3 +1,4 @@
+import os
 import re
 
 PATH_SEP_CHARS = "/\\"
@@ -13,6 +14,60 @@ UNKNOWN_SEP_CHARS_REGEX = re.compile(r"[/\\]+")
 UNKNOWN_PATH_TYPE_SPLIT_TO_PARENT_AND_CHILD_REGEX = re.compile(
     r"^(?P<parent>.*[/\\]+)(?P<child>[^/\\]+[/\\]*)?$"
 )
+
+
+class PathMap:
+    """
+    Maps host paths to container paths.
+    """
+
+    def __init__(
+        self,
+        host_paths: "list[str]",
+        container_abs: str = "/h/abs",
+        container_rel: str = "/h/rel",
+    ) -> None:
+
+        normalized_host_paths = [normalize_path(host_path) for host_path in host_paths]
+        self.mounts, self.mappings = PathMap.__map_host_to_container(
+            normalized_host_paths, container_abs, container_rel
+        )
+
+    def get_mounts(self) -> "list[str]":
+        """
+        Returns the list of mounts that should be made to accomodate the host paths used to
+        construct this PathMap
+        """
+        return self.mounts
+
+    def get_container_path(self, host_path: str) -> str:
+        """
+        Return the already-mapped container_path for the specified host_path.
+        """
+        normalized_host_path = normalize_path(host_path)
+        return self.mappings[normalized_host_path]
+
+    @staticmethod
+    def __map_host_to_container(host_paths, container_abs, container_rel):
+        """
+        Takes a set of host paths, and computes the list of host paths needing mounting, and
+        a mapping of all related host_paths (those explicitly provided, and those needing mounting)
+        to container paths.
+        """
+        min_mounts = reduce_mounts(host_paths)
+        map_host_to_container_paths = {}
+
+        for path in host_paths:
+            nix_path = transform_to_nix_path(path)
+
+            if nix_path.startswith("/"):
+                container_path = os.path.join(container_abs, nix_path.lstrip("/"))
+            else:
+                container_path = os.path.join(container_rel, nix_path)
+
+            map_host_to_container_paths[path] = container_path
+
+        return min_mounts, map_host_to_container_paths
 
 
 def normalize_path(candidate):
@@ -116,21 +171,3 @@ def parse_parent_child(mount):
             parent = parent_trimmed
 
     return parent, match.group("child")
-
-
-def map_host_to_container(host_paths, container_root_target):
-    """
-    Takes a set of host paths, and computes the list of host paths needing mounting, and
-    a mapping of all related host_paths (those explicitly provided, and those needing mounting)
-    to container paths.
-    """
-    min_mounts = reduce_mounts(host_paths)
-    map_host_to_container_paths = {}
-
-    for path in host_paths:
-        container_path = transform_to_nix_path(path)
-        if container_path.startswith("/"):
-            container_path = container_root_target + container_path
-        map_host_to_container_paths[path] = container_path
-
-    return min_mounts, map_host_to_container_paths

@@ -93,26 +93,40 @@ def test_transform_to_nix_path(given, want):
 
 
 @pytest.mark.parametrize(
-    "given_paths,want_map",
+    "given_paths,want_mappings",
     [
-        pytest.param(["/a"], {"/a": "/h/a"}, id="trivial"),
+        pytest.param(["/a"], {"/a": "/h/abs/a"}, id="absolute - trivial"),
+        pytest.param(["a"], {"a": "/h/rel/a"}, id="relative - trivial"),
         pytest.param(
             ["/a/b/", "/c", "c:\\d"],
             {
-                "/a/b/": "/h/a/b",
-                "/c": "/h/c",
-                "c:\\d": "/h/d",
+                "/a/b/": "/h/abs/a/b",
+                "/c": "/h/abs/c",
+                "c:\\d": "/h/abs/d",
             },
-            id="multiple - absolute",
+            id="absolute - multiple - mix linux and win",
         ),
     ],
 )
-def test_map_host_to_container(given_paths, want_map):
+def test_map_host_to_container_jiggy(given_paths, want_mappings):
+    # given
+    sut = pathmap.PathMap(given_paths, container_abs="/h/abs", container_rel="/h/rel")
 
-    mounts, mapping = pathmap.map_host_to_container(given_paths, "/h")
+    # when
+    mounts = sut.get_mounts()
+    result_mappings = {
+        host_path: sut.get_container_path(host_path)
+        for host_path in want_mappings.keys()
+    }
 
-    mapping_keys = mapping.keys()
+    # then
     for mount_host in mounts:
-        assert mount_host in mapping_keys, "reduced mounts should have mappings"
+        mount_container = sut.get_container_path(mount_host)
+        assert (
+            len(mount_container.strip()) > 0
+        ), "reduced mount should have a non-empty mapping"
+        assert (
+            mount_host != mount_container
+        ), "reduced mount should be mapped to container path"
 
-    assert mapping == want_map
+    assert result_mappings == want_mappings
