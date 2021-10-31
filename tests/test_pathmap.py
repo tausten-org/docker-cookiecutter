@@ -6,6 +6,8 @@ from docker_cookiecutter import pathmap
     "given,want",
     [
         pytest.param(["a"], ["a"], id="single - relative - trivial"),
+        pytest.param(["./a"], ["a"], id="single - cwd + sub - trivial"),
+        pytest.param(["."], ["."], id="single - cwd - trivial"),
         pytest.param(["../a"], ["../a"], id="single - relative - parent - linux"),
         pytest.param(["..\\a"], ["../a"], id="single - relative - parent - win"),
         pytest.param(["/"], ["/"], id="single - root - linux"),
@@ -33,6 +35,8 @@ def test_reduce_mounts(given, want):
     "given,want",
     [
         pytest.param("a", "a", id="trivial"),
+        pytest.param(".", ".", id="trivial - cwd"),
+        pytest.param("a/.", "a", id="trivial - redundant dot"),
         pytest.param("a/", "a", id="trailing - linux"),
         pytest.param("a\\", "a", id="trailing - win"),
         pytest.param("/", "/", id="root - linux"),
@@ -41,6 +45,10 @@ def test_reduce_mounts(given, want):
         pytest.param("c:\\\\\\", "c:/", id="root - repeated - win"),
         pytest.param("a/b", "a/b", id="inner - trivial - linux"),
         pytest.param("a///b", "a/b", id="inner - repeated - linux"),
+        pytest.param("/a/b/../c", "/a/c", id="absolute - redundant relative - linux"),
+        pytest.param(
+            "d:\\a\\b\\..\\c", "d:/a/c", id="absolute - redundant relative - win"
+        ),
     ],
 )
 def test_normalize_path(given, want):
@@ -52,6 +60,9 @@ def test_normalize_path(given, want):
     "given,want",
     [
         pytest.param("a", "a", id="trivial"),
+        pytest.param(".", ".", id="trivial - cwd"),
+        pytest.param("a/.", "a", id="trivial - redundant dot"),
+        pytest.param("./a", "a", id="single - cwd + sub - trivial"),
         pytest.param("a/", "a", id="trailing - linux"),
         pytest.param("a\\", "a", id="trailing - win"),
         pytest.param("\\\\host\\computer\\dir", "/host/computer/dir", id="unc - win"),
@@ -79,7 +90,20 @@ def test_transform_to_nix_path(given, want):
         pytest.param(["/a"], {"/a": "/h/abs/a"}, id="absolute - trivial - linux"),
         pytest.param(["D:\\a"], {"D:\\a": "/h/abs/a"}, id="absolute - trivial - win"),
         pytest.param(["a"], {"a": "/h/rel/a"}, id="relative - sub - trivial"),
+        pytest.param(["."], {".": "/h/rel"}, id="relative - cwd - trivial"),
         pytest.param(["../a"], {"../a": "/h/rel/a"}, id="relative - parent - trivial"),
+        pytest.param(
+            ["../a", "e/f", "../../b", "d/g/h", "../a/c", "d"],
+            {
+                "../a": "/h/rel/dd/a",
+                "e/f": "/h/rel/dd/dd/e/f",
+                "../../b": "/h/rel/b",
+                "d/g/h": "/h/rel/dd/dd/d/g/h",
+                "../a/c": "/h/rel/dd/a/c",
+                "d": "/h/rel/dd/dd/d",
+            },
+            id="relative - parent - multi",
+        ),
         pytest.param(
             ["/a/b/", "/c", "c:\\d"],
             {
@@ -91,7 +115,7 @@ def test_transform_to_nix_path(given, want):
         ),
     ],
 )
-def test_map_host_to_container_jiggy(given_paths, want_mappings):
+def test_map_host_to_container(given_paths, want_mappings):
     # given
     sut = pathmap.PathMap(given_paths, container_abs="/h/abs", container_rel="/h/rel")
 

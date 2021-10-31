@@ -196,10 +196,10 @@ def test_cookiecutter_to_docker_args_list(given, want):
         ),
         pytest.param(
             "cookiecutter -o ../../output ../../../some/path/someTemplate",
-            "cookiecutter -o /h/rel/dd/dd/dd/wd/../../output /h/rel/dd/dd/dd/wd/../../../some/path/someTemplate",
+            "cookiecutter -o /h/rel/dd/output /h/rel/some/path/someTemplate",
             [
-                '--mount type=bind,source="$(pwd)/../../output",target="/h/rel/dd/dd/dd/wd/../../output"',
-                '--mount type=bind,source="$(pwd)/../../../some/path/someTemplate",target="/h/rel/dd/dd/dd/wd/../../../some/path/someTemplate"',
+                '--mount type=bind,source="$(pwd)/../../output",target="/h/rel/dd/output"',
+                '--mount type=bind,source="$(pwd)/../../../some/path/someTemplate",target="/h/rel/some/path/someTemplate"',
             ],
             id="relative - above wd - does not collapse dotted relations",
         ),

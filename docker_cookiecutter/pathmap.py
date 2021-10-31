@@ -2,6 +2,7 @@ import ntpath
 import os
 import posixpath
 import re
+from typing import Tuple
 
 # Regex for finding separators
 UNKNOWN_SEP_CHARS_REGEX = re.compile(r"[/\\]+")
@@ -29,7 +30,7 @@ class PathMap:
         """
         normalized_host_paths = [normalize_path(host_path) for host_path in host_paths]
         self.mounts, self.mappings = PathMap.__map_host_to_container(
-            normalized_host_paths, container_abs, container_rel
+            normalized_host_paths, container_abs, container_rel, container_rel_dd
         )
 
     def get_mounts(self) -> "list[str]":
@@ -47,7 +48,9 @@ class PathMap:
         return self.mappings[normalized_host_path]
 
     @staticmethod
-    def __map_host_to_container(host_paths, container_abs, container_rel):
+    def __map_host_to_container(
+        host_paths, container_abs, container_rel, container_rel_dd
+    ):
         """
         Takes a set of host paths, and computes the list of host paths needing mounting, and
         a mapping of all related host_paths (those explicitly provided, and those needing mounting)
@@ -55,6 +58,7 @@ class PathMap:
         """
         min_mounts = reduce_mounts(host_paths)
         map_host_to_container_paths = {}
+        relative_path_tuples = []
 
         for path in host_paths:
             nix_path = transform_to_nix_path(path)
@@ -63,12 +67,47 @@ class PathMap:
                 container_path = posixpath.join(
                     container_abs, nix_path.lstrip(posixpath.sep)
                 )
+                map_host_to_container_paths[path] = container_path
             else:
-                container_path = posixpath.join(container_rel, nix_path)
+                relative_path_tuples.append((nix_path, path))
 
-            map_host_to_container_paths[path] = container_path
+        # now handle the relative paths
+        relative_path_tuples.sort()
+        relative_path_prefix = container_rel
+        current_relative_path_head = None
+        for relative, host_path in relative_path_tuples:
+            head, tail = split_relative(relative)
+
+            if (
+                current_relative_path_head is not None
+                and current_relative_path_head != head
+            ):
+                relative_path_prefix = posixpath.join(
+                    relative_path_prefix, container_rel_dd
+                )
+
+            current_relative_path_head = head
+
+            container_path = normalize_path(posixpath.join(relative_path_prefix, tail))
+
+            map_host_to_container_paths[host_path] = container_path
 
         return min_mounts, map_host_to_container_paths
+
+
+def split_relative(path: str) -> Tuple[str, str]:
+    """
+    Takes a normalized potentially relative path and splits it into the relative portion
+    """
+    rel = None
+    tail = path
+    pos = path.rfind("../")
+    if pos >= 0:
+        split_pos = pos + len("../")
+        rel = path[:split_pos]
+        tail = path[split_pos:]
+
+    return (rel, tail)
 
 
 def normalize_path(candidate):
