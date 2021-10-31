@@ -6,10 +6,12 @@ from docker_cookiecutter import pathmap
     "given,want",
     [
         pytest.param(["a"], ["a"], id="single - relative - trivial"),
+        pytest.param(["../a"], ["../a"], id="single - relative - parent - linux"),
+        pytest.param(["..\\a"], ["../a"], id="single - relative - parent - win"),
         pytest.param(["/"], ["/"], id="single - root - linux"),
         pytest.param(["/a"], ["/a"], id="single - absolute - linux"),
-        pytest.param(["c:\\"], ["c:\\"], id="single - root - windows"),
-        pytest.param(["c:\\a"], ["c:\\a"], id="single - absolute - windows"),
+        pytest.param(["c:\\"], ["c:/"], id="single - root - win"),
+        pytest.param(["c:\\a"], ["c:/a"], id="single - absolute - win"),
         pytest.param(["a", "b"], ["a", "b"], id="multi - no overlap"),
         pytest.param(["a", "a/b"], ["a"], id="multi - mounting both parent and child"),
         pytest.param(
@@ -32,11 +34,11 @@ def test_reduce_mounts(given, want):
     [
         pytest.param("a", "a", id="trivial"),
         pytest.param("a/", "a", id="trailing - linux"),
-        pytest.param("a\\", "a", id="trailing - windows"),
+        pytest.param("a\\", "a", id="trailing - win"),
         pytest.param("/", "/", id="root - linux"),
         pytest.param("///", "/", id="root - repeated - linux"),
-        pytest.param("c:\\", "c:\\", id="root - windows"),
-        pytest.param("c:\\\\\\", "c:\\", id="root - repeated - windows"),
+        pytest.param("c:\\", "c:/", id="root - win"),
+        pytest.param("c:\\\\\\", "c:/", id="root - repeated - win"),
         pytest.param("a/b", "a/b", id="inner - trivial - linux"),
         pytest.param("a///b", "a/b", id="inner - repeated - linux"),
     ],
@@ -47,44 +49,23 @@ def test_normalize_path(given, want):
 
 
 @pytest.mark.parametrize(
-    "given,want_parent,want_child",
-    [
-        pytest.param("a", None, "a", id="trivial - relative"),
-        pytest.param("/", None, "/", id="trivial - absolute - root - linux"),
-        pytest.param("c:\\", None, "c:\\", id="trivial - absolute - root - windows"),
-        pytest.param("/a", "/", "a", id="trivial - absolute - one level"),
-        pytest.param("/a/b/c", "/a/b", "c", id="absolute - multi level"),
-        pytest.param(
-            "c:\\a\\b\\c", "c:\\a\\b", "c", id="absolute - multi level - windows"
-        ),
-        pytest.param(
-            "/a/b/c/", "/a/b", "c", id="absolute - multi level - trailing slash"
-        ),
-        pytest.param(
-            "c:\\a\\b\\c\\",
-            "c:\\a\\b",
-            "c",
-            id="absolute - multi level - trailing slash - windows",
-        ),
-    ],
-)
-def test_parse_parent_child(given, want_parent, want_child):
-    result_parent, result_child = pathmap.parse_parent_child(given)
-    assert (result_parent, result_child) == (want_parent, want_child)
-
-
-@pytest.mark.parametrize(
     "given,want",
     [
         pytest.param("a", "a", id="trivial"),
         pytest.param("a/", "a", id="trailing - linux"),
-        pytest.param("a\\", "a", id="trailing - windows"),
+        pytest.param("a\\", "a", id="trailing - win"),
+        pytest.param("\\\\host\\computer\\dir", "/host/computer/dir", id="unc - win"),
+        pytest.param("//host/computer/dir", "/host/computer/dir", id="unc - linux"),
         pytest.param("/", "/", id="root - linux"),
         pytest.param("///", "/", id="root - repeated - linux"),
-        pytest.param("c:\\", "/", id="root - windows"),
-        pytest.param("c:\\\\\\", "/", id="root - repeated - windows"),
+        pytest.param("c:\\", "/", id="root - win"),
+        pytest.param("c:\\\\\\", "/", id="root - repeated - win"),
         pytest.param("a/b", "a/b", id="inner - trivial - linux"),
         pytest.param("a///b", "a/b", id="inner - repeated - linux"),
+        pytest.param("/a/b/../c", "/a/c", id="absolute - redundant relative - linux"),
+        pytest.param(
+            "d:\\a\\b\\..\\c", "/a/c", id="absolute - redundant relative - win"
+        ),
     ],
 )
 def test_transform_to_nix_path(given, want):
@@ -95,8 +76,10 @@ def test_transform_to_nix_path(given, want):
 @pytest.mark.parametrize(
     "given_paths,want_mappings",
     [
-        pytest.param(["/a"], {"/a": "/h/abs/a"}, id="absolute - trivial"),
-        pytest.param(["a"], {"a": "/h/rel/a"}, id="relative - trivial"),
+        pytest.param(["/a"], {"/a": "/h/abs/a"}, id="absolute - trivial - linux"),
+        pytest.param(["D:\\a"], {"D:\\a": "/h/abs/a"}, id="absolute - trivial - win"),
+        pytest.param(["a"], {"a": "/h/rel/a"}, id="relative - sub - trivial"),
+        pytest.param(["../a"], {"../a": "/h/rel/a"}, id="relative - parent - trivial"),
         pytest.param(
             ["/a/b/", "/c", "c:\\d"],
             {

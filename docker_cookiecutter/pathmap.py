@@ -1,19 +1,10 @@
+import ntpath
 import os
+import posixpath
 import re
-
-PATH_SEP_CHARS = "/\\"
-
-# Regex to detect groups of repeated separator-like chars, and pull out the first char as a
-# capture group
-REPETITION_OF_UNKNOWN_SEP_CHARS_REGEX = re.compile(r"([/\\])(?:[/\\]+)")
 
 # Regex for finding separators
 UNKNOWN_SEP_CHARS_REGEX = re.compile(r"[/\\]+")
-
-# Regex to split a path (of unkown origin - windows or linux) into (parent, child) groups
-UNKNOWN_PATH_TYPE_SPLIT_TO_PARENT_AND_CHILD_REGEX = re.compile(
-    r"^(?P<parent>.*[/\\]+)(?P<child>[^/\\]+[/\\]*)?$"
-)
 
 
 class PathMap:
@@ -26,8 +17,16 @@ class PathMap:
         host_paths: "list[str]",
         container_abs: str = "/h/abs",
         container_rel: str = "/h/rel",
+        container_rel_dd: str = "dd",
     ) -> None:
-
+        """
+        Args:
+            host_paths: list of host paths to map to container mounts and paths
+            container_abs: the container folder under which absolute host paths will be mapped
+            container_rel: the container folder under which relative host paths will be mapped
+            container_rel_dd: a folder name to use to stand in for ".." which will force
+                additional levels of sub-folders to be included under container_rel
+        """
         normalized_host_paths = [normalize_path(host_path) for host_path in host_paths]
         self.mounts, self.mappings = PathMap.__map_host_to_container(
             normalized_host_paths, container_abs, container_rel
@@ -61,9 +60,11 @@ class PathMap:
             nix_path = transform_to_nix_path(path)
 
             if nix_path.startswith("/"):
-                container_path = os.path.join(container_abs, nix_path.lstrip("/"))
+                container_path = posixpath.join(
+                    container_abs, nix_path.lstrip(posixpath.sep)
+                )
             else:
-                container_path = os.path.join(container_rel, nix_path)
+                container_path = posixpath.join(container_rel, nix_path)
 
             map_host_to_container_paths[path] = container_path
 
@@ -75,31 +76,33 @@ def normalize_path(candidate):
     Path origin is unknown, but we wish to collapse consecutive separators down to singles
     and trim any final trailing separator (but only if the path is not for "root" folder)
     """
-    norm = REPETITION_OF_UNKNOWN_SEP_CHARS_REGEX.sub(r"\1", candidate).rstrip(
-        PATH_SEP_CHARS
-    )
+    # CAUTION: Making simplifying assumption that any and all "\" characters are just folder
+    # separators (eg. from windows path), and not actually meant to be escaping anything.
+    norm = UNKNOWN_SEP_CHARS_REGEX.sub(posixpath.sep, candidate)
+
+    norm = os.path.normpath(norm)
 
     # Special case - we've hit a root path, so add the slash back
-    if len(norm) == 0 or norm.endswith(":"):
-        norm += candidate[-1]
+    if len(norm) == 0 or norm.endswith(posixpath.pathsep):
+        norm += posixpath.sep
 
     return norm
 
 
-def transform_to_nix_path(candidate):
+def transform_to_nix_path(candidate: str):
     """
     Path origin is unknown, but we wish to transform it to a comparable *nix path
     """
-    norm = UNKNOWN_SEP_CHARS_REGEX.sub("/", candidate)
+    # CAUTION: Making simplifying assumption that any and all "\" characters are just folder
+    # separators (eg. from windows path), and not actually meant to be escaping anything.
+    norm = UNKNOWN_SEP_CHARS_REGEX.sub(posixpath.sep, candidate)
 
-    # Special case - let's strip off any windowsy drive letter preamble
-    drive_sep_pos = norm.find(":")
-    if drive_sep_pos >= 0:
-        norm = norm[drive_sep_pos + 1 :]
+    # let's ensure we skip any possible windows / UNC drive bit
+    _, tail = ntpath.splitdrive(norm)
+    norm = tail
 
-    # Let's trim trailing slash (unless it's root)
-    norm = norm if len(norm) <= 1 else norm.rstrip(PATH_SEP_CHARS)
-
+    # finally, we normalize to unix
+    norm = posixpath.normpath(norm)
     return norm
 
 
@@ -112,20 +115,23 @@ def reduce_mounts(inputs):
     reduced_mounts = []
 
     # make sure our inputs are sorted so that we get to parents before children
+    inputs = [normalize_path(p) for p in inputs]
     inputs.sort()
 
     for mount in inputs:
-        parent, child = parse_parent_child(mount)
-        is_root = parent is None
+        parent, _ = parse_parent_child(mount)
         # if we're mounting a folder other than root, we should strip trailing separators
-        parent_trimmed = parent.rstrip(PATH_SEP_CHARS) if not is_root else None
+        # parent_trimmed = parent.rstrip(PATH_SEP_CHARS) if not is_root_mount else None
         if not has_mount_or_parent_mount_recurse(
-            parent_trimmed, reduced_mounts, has_mount_or_parent_mount
+            parent, reduced_mounts, has_mount_or_parent_mount
         ):
-            candidate = mount.rstrip(PATH_SEP_CHARS) if not is_root else child
-            reduced_mounts.append(candidate)
+            reduced_mounts.append(mount)
 
     return reduced_mounts
+
+
+def is_root(parent: str, child: str) -> bool:
+    return len(child) < 1 and (len(parent) < 1 or parent.endswith(posixpath.sep))
 
 
 def has_mount_or_parent_mount_recurse(
@@ -143,8 +149,8 @@ def has_mount_or_parent_mount_recurse(
     if candidate in explicit_mounts:
         status = True
     else:
-        parent, _ = parse_parent_child(candidate)
-        if parent is None:
+        parent, child = parse_parent_child(candidate)
+        if is_root(parent, child):
             status = False
         else:
             status = has_mount_or_parent_mount_recurse(
@@ -157,17 +163,4 @@ def has_mount_or_parent_mount_recurse(
 
 
 def parse_parent_child(mount):
-    mount_trimmed = mount.rstrip(PATH_SEP_CHARS)
-    match = UNKNOWN_PATH_TYPE_SPLIT_TO_PARENT_AND_CHILD_REGEX.match(mount_trimmed)
-    if match is None:
-        return None, mount
-
-    # strip away trailing slash on parent
-    parent = match.group("parent")
-    if parent is not None:
-        parent_trimmed = parent.rstrip(PATH_SEP_CHARS)
-        # deal with the "root" folder - we don't want to strip that slash
-        if len(parent_trimmed) > 0 and not parent_trimmed.endswith(":"):
-            parent = parent_trimmed
-
-    return parent, match.group("child")
+    return os.path.split(mount)
