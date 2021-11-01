@@ -134,7 +134,7 @@ def normalize_path(candidate: str) -> str:
     # separators (eg. from windows path), and not actually meant to be escaping anything.
     norm = UNKNOWN_SEP_CHARS_REGEX.sub(posixpath.sep, candidate)
 
-    norm = os.path.normpath(norm)
+    norm = posixpath.normpath(norm)
 
     # Special case - we've hit a root path, so add the slash back
     if len(norm) == 0 or norm.endswith(posixpath.pathsep):
@@ -230,4 +230,4 @@ def has_mount_or_parent_mount_recurse(
 
 
 def parse_parent_child(mount):
-    return os.path.split(mount)
+    return posixpath.split(mount)

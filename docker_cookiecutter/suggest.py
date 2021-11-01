@@ -1,5 +1,6 @@
 import argparse
 import os
+import posixpath
 import sys
 
 from docker_cookiecutter import pathmap
@@ -129,7 +130,7 @@ def quote_if_necessary(val: str) -> str:
 
 
 def get_root_basename(filepath):
-    return os.path.join("/", os.path.basename(filepath))
+    return posixpath.join("/", posixpath.basename(filepath))
 
 
 def get_from_path_map_quoted(path_map: pathmap.PathMap, path: str) -> str:
