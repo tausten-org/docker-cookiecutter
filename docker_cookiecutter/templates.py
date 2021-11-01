@@ -40,7 +40,7 @@ def encode_template_sources(sources):
     return CONST.TEMPLATE_DELIM.join(templates)
 
 
-def decode_template_sources(template):
+def decode_template_sources(template: str) -> "list[TemplateSourceInfo]":
     result = []
     if template is not None and len(template) > 0:
         template_strings = template.split(CONST.TEMPLATE_DELIM)

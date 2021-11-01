@@ -1,7 +1,9 @@
 import argparse
 import os
+import posixpath
 import sys
 
+from docker_cookiecutter import pathmap
 from docker_cookiecutter.templates import (
     TemplateSourceInfo,
     decode_template_sources,
@@ -17,9 +19,6 @@ class CONST(object):
     DOCKER_ARGS_TO_PRUNE = DOCKER_PREAMBLE + ["-i", "-t"]
     CC = "cookiecutter"
     CCS = "cookiecutters"
-    CC_OUT = ["-o", "/out"]
-    CC_CMD_AND_PREAMBLE = [CC] + CC_OUT
-    CCS_CMD_AND_PREAMBLE = [CCS] + CC_OUT
     CC_REPLAY_FILE = "/.cookiecutter_replay/in.json"
 
 
@@ -40,14 +39,19 @@ def split_docker_from_cookiecutter(given):
     return got_docker, got_cookiecutter
 
 
-def docker_mount_args(host, container):
+def docker_mount_args(host: str, container: str) -> "list[str]":
     if host.startswith(".") or not host.startswith("/") and "$(pwd)" not in host:
-        host = '"$(pwd)"/' + host
-    # return ["-v", host + ":" + container]
+        tail = host.lstrip("./") if not host.startswith("..") else host
+        host = '"$(pwd)"'
+        if len(tail) > 0:
+            host += "/" + quote_if_necessary(tail)
+
+    container = quote_if_necessary(container)
+
     return ["--mount", "type=bind,source=" + host + ",target=" + container]
 
 
-def is_fs_template(template):
+def is_fs_template(template: str) -> bool:
     if template is None or template.isspace():
         return False
 
@@ -112,8 +116,12 @@ def parse_cookiecutter(args):
     return (ns, item, extra)
 
 
-def quote_if_necessary(val):
-    if not val.startswith('"') and not val.startswith("'") and " " in val:
+def quote_if_necessary(val: str) -> str:
+    if (
+        not val.startswith('"')
+        and not val.startswith("'")
+        and (" " in val or "$" in val)
+    ):
         if "'" in val:
             return '"' + val + '"'
         return "'" + val + "'"
@@ -121,15 +129,20 @@ def quote_if_necessary(val):
     return val
 
 
-def quote_args(args):
-    return [quote_if_necessary(x) for x in args]
-
-
 def get_root_basename(filepath):
-    return os.path.join("/", os.path.basename(filepath))
+    return posixpath.join("/", posixpath.basename(filepath))
 
 
-def cookiecutter_to_docker_args(args):
+def get_from_path_map_quoted(path_map: pathmap.PathMap, path: str) -> str:
+    return quote_if_necessary(path_map.get_container_path(path))
+
+
+def cookiecutter_to_docker_args(
+    args: "list[str]",
+    container_abs: str = "/h/abs",
+    container_rel: str = "/h/rel",
+    container_dd: str = "dd",
+):
     docker, cookiecutter = split_docker_from_cookiecutter(args)
 
     _, docker_image, docker_extra = parse_docker(docker[1:])
@@ -138,38 +151,39 @@ def cookiecutter_to_docker_args(args):
     result = CONST.DOCKER_PREAMBLE + docker_extra + CONST.DOCKER_USER
 
     cc_templates = decode_template_sources(cc_template)
-    new_templates = []
 
-    for i, t in enumerate(cc_templates):
-        # volume mount for template if it's a filesystem input
-        if is_fs_template(t.template):
-            new_template = "/in"
-            if len(cc_templates) > 1:
-                new_template += f"-{i}"
+    # Build up a path map of host-to-container paths we'll use for volume mounting and
+    # argument adjustments later
+    path_map_builder = pathmap.PathMapBuilder()
 
-            result.extend(docker_mount_args(t.template, new_template))
-            new_templates.append(TemplateSourceInfo(new_template))
-        else:
-            new_templates.append(t)
+    # Add the file-based template(s) to teh builder
+    for template_path in [
+        t.template for t in cc_templates if is_fs_template(t.template)
+    ]:
+        path_map_builder.add_path(template_path)
 
-    cc_template = encode_template_sources(new_templates)
+    # Add the other path-based arguments to the builder
+    if not cc_parsed.output_dir:
+        cc_parsed.output_dir = "."
+    path_map_builder.add_path(cc_parsed.output_dir)
 
-    # special handling of output - the preamble with always specify `-o /out`, and
-    # we just need to make sure we include the volume mount as needed
-    host_output_folder = cc_parsed.output_dir if cc_parsed.output_dir else '"$(pwd)"'
-    result.extend(docker_mount_args(host_output_folder, "/out"))
-
-    # volume mount for config-file
-    config_file = None
     if cc_parsed.config_file:
-        config_file = get_root_basename(cc_parsed.config_file)
-        result.extend(docker_mount_args(cc_parsed.config_file, config_file))
+        path_map_builder.add_path(cc_parsed.config_file)
 
-    # volume mount for debug-file
-    debug_file = None
     if cc_parsed.debug_file:
-        debug_file = get_root_basename(cc_parsed.debug_file)
-        result.extend(docker_mount_args(cc_parsed.debug_file, debug_file))
+        path_map_builder.add_path(cc_parsed.debug_file)
+
+    # Now that we've accumulated all the paths we need, build the path map so we can look mounts
+    # and mappings up
+    path_map = path_map_builder.build(container_abs, container_rel, container_dd)
+
+    # Add the mounts
+    for mount_host_path in path_map.get_mounts():
+        result.extend(
+            docker_mount_args(
+                mount_host_path, path_map.get_container_path(mount_host_path)
+            )
+        )
 
     # volume mount for replay-file
     # This is a special case in that although cookiecutter docs indicate this is a supported
@@ -178,14 +192,27 @@ def cookiecutter_to_docker_args(args):
     if cc_parsed.replay_file:
         result.extend(docker_mount_args(cc_parsed.replay_file, CONST.CC_REPLAY_FILE))
 
+    # Handle containerizing the templates param
+    container_mapped_templates = []
+    for template_info in cc_templates:
+        # If it's a filesystem input, update to container-path
+        if is_fs_template(template_info.template):
+            container_mapped_templates.append(
+                TemplateSourceInfo(path_map.get_container_path(template_info.template))
+            )
+        else:
+            container_mapped_templates.append(template_info)
+
+    cc_template = encode_template_sources(container_mapped_templates)
+
     # wrap up the docker portion with the image
     result.append(docker_image)
 
-    result.extend(
-        CONST.CC_CMD_AND_PREAMBLE
-        if len(cc_templates) < 2
-        else CONST.CCS_CMD_AND_PREAMBLE
-    )
+    # Build up the cookiecutter(s) portion now
+    result.append(CONST.CC if len(cc_templates) < 2 else CONST.CCS)
+
+    # Add the output folder
+    result.extend(["-o", get_from_path_map_quoted(path_map, cc_parsed.output_dir)])
 
     # Handle all the flag args
     if cc_parsed.no_input:
@@ -207,9 +234,13 @@ def cookiecutter_to_docker_args(args):
     if cc_parsed.directory:
         result.extend(["--directory", cc_parsed.directory])
     if cc_parsed.config_file:
-        result.extend(["--config-file", config_file])
+        result.extend(
+            ["--config-file", get_from_path_map_quoted(path_map, cc_parsed.config_file)]
+        )
     if cc_parsed.debug_file:
-        result.extend(["--debug-file", debug_file])
+        result.extend(
+            ["--debug-file", get_from_path_map_quoted(path_map, cc_parsed.debug_file)]
+        )
 
     # add the (possibly updated) template param
     if cc_template is not None and len(cc_template) > 0 and not cc_template.isspace():
@@ -219,7 +250,7 @@ def cookiecutter_to_docker_args(args):
     if cc_extra is not None and len(cc_extra) > 0:
         result.extend(cc_extra)
 
-    return quote_args(result)
+    return result
 
 
 if __name__ == "__main__":

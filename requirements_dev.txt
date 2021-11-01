@@ -8,4 +8,5 @@ cookiecutter==1.*
 poetry>=1.1.8
 livereload>=2.6.3
 pytest>=6.2.5
+pytest-mock>=3.6.1
 pre-commit>=2.12.0
