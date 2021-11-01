@@ -5,8 +5,8 @@ from docker_cookiecutter import pathmap
 @pytest.mark.parametrize(
     "given,want",
     [
-        pytest.param(["a"], ["a"], id="single - relative - trivial"),
-        pytest.param(["./a"], ["a"], id="single - cwd + sub - trivial"),
+        pytest.param(["a"], ["./a"], id="single - relative - trivial"),
+        pytest.param(["./a"], ["./a"], id="single - explicit relative - trivial"),
         pytest.param(["."], ["."], id="single - cwd - trivial"),
         pytest.param(["../a"], ["../a"], id="single - relative - parent - linux"),
         pytest.param(["..\\a"], ["../a"], id="single - relative - parent - win"),
@@ -14,15 +14,22 @@ from docker_cookiecutter import pathmap
         pytest.param(["/a"], ["/a"], id="single - absolute - linux"),
         pytest.param(["c:\\"], ["c:/"], id="single - root - win"),
         pytest.param(["c:\\a"], ["c:/a"], id="single - absolute - win"),
-        pytest.param(["a", "b"], ["a", "b"], id="multi - no overlap"),
-        pytest.param(["a", "a/b"], ["a"], id="multi - mounting both parent and child"),
+        pytest.param(["a", "b"], ["./a", "./b"], id="multi - no overlap"),
         pytest.param(
-            ["a", "a/b/c"], ["a"], id="multi - mounting both parent and indirect child"
+            ["a", "a/b"], ["./a"], id="multi - mounting both parent and child"
+        ),
+        pytest.param(
+            ["a", "a/b/c"],
+            ["./a"],
+            id="multi - mounting both parent and indirect child",
         ),
         pytest.param(
             ["a/b", "a"],
-            ["a"],
+            ["./a"],
             id="multi - mounting both parent and child - out of order",
+        ),
+        pytest.param(
+            [".", "sub/folder"], ["."], id="multi - cwd and sub just mounts cwd"
         ),
     ],
 )
@@ -34,17 +41,17 @@ def test_reduce_mounts(given, want):
 @pytest.mark.parametrize(
     "given,want",
     [
-        pytest.param("a", "a", id="trivial"),
+        pytest.param("a", "./a", id="trivial"),
         pytest.param(".", ".", id="trivial - cwd"),
-        pytest.param("a/.", "a", id="trivial - redundant dot"),
-        pytest.param("a/", "a", id="trailing - linux"),
-        pytest.param("a\\", "a", id="trailing - win"),
+        pytest.param("a/.", "./a", id="trivial - redundant dot"),
+        pytest.param("a/", "./a", id="trailing - linux"),
+        pytest.param("a\\", "./a", id="trailing - win"),
         pytest.param("/", "/", id="root - linux"),
         pytest.param("///", "/", id="root - repeated - linux"),
         pytest.param("c:\\", "c:/", id="root - win"),
         pytest.param("c:\\\\\\", "c:/", id="root - repeated - win"),
-        pytest.param("a/b", "a/b", id="inner - trivial - linux"),
-        pytest.param("a///b", "a/b", id="inner - repeated - linux"),
+        pytest.param("a/b", "./a/b", id="inner - trivial - linux"),
+        pytest.param("a///b", "./a/b", id="inner - repeated - linux"),
         pytest.param("/a/b/../c", "/a/c", id="absolute - redundant relative - linux"),
         pytest.param(
             "d:\\a\\b\\..\\c", "d:/a/c", id="absolute - redundant relative - win"
@@ -59,20 +66,20 @@ def test_normalize_path(given, want):
 @pytest.mark.parametrize(
     "given,want",
     [
-        pytest.param("a", "a", id="trivial"),
+        pytest.param("a", "./a", id="trivial"),
         pytest.param(".", ".", id="trivial - cwd"),
-        pytest.param("a/.", "a", id="trivial - redundant dot"),
-        pytest.param("./a", "a", id="single - cwd + sub - trivial"),
-        pytest.param("a/", "a", id="trailing - linux"),
-        pytest.param("a\\", "a", id="trailing - win"),
+        pytest.param("a/.", "./a", id="trivial - redundant dot"),
+        pytest.param("./a", "./a", id="single - cwd + sub - trivial"),
+        pytest.param("a/", "./a", id="trailing - linux"),
+        pytest.param("a\\", "./a", id="trailing - win"),
         pytest.param("\\\\host\\computer\\dir", "/host/computer/dir", id="unc - win"),
         pytest.param("//host/computer/dir", "/host/computer/dir", id="unc - linux"),
         pytest.param("/", "/", id="root - linux"),
         pytest.param("///", "/", id="root - repeated - linux"),
         pytest.param("c:\\", "/", id="root - win"),
         pytest.param("c:\\\\\\", "/", id="root - repeated - win"),
-        pytest.param("a/b", "a/b", id="inner - trivial - linux"),
-        pytest.param("a///b", "a/b", id="inner - repeated - linux"),
+        pytest.param("a/b", "./a/b", id="inner - trivial - linux"),
+        pytest.param("a///b", "./a/b", id="inner - repeated - linux"),
         pytest.param("/a/b/../c", "/a/c", id="absolute - redundant relative - linux"),
         pytest.param(
             "d:\\a\\b\\..\\c", "/a/c", id="absolute - redundant relative - win"

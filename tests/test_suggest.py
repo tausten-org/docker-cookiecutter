@@ -44,32 +44,38 @@ def test_split_docker_from_cookiecutter(given, want_docker, want_cookiecutter):
         pytest.param(
             "/some/path",
             "/in",
-            ["--mount", "type=bind,source=/some/path,target=/in"],
+            "--mount type=bind,source=/some/path,target=/in",
             id="normal",
         ),
         pytest.param(
             '"$(pwd)"/stuff',
             "/in",
-            ["--mount", 'type=bind,source="$(pwd)"/stuff,target=/in'],
+            '--mount type=bind,source="$(pwd)"/stuff,target=/in',
             id="already has pwd",
         ),
         pytest.param(
             "relative/path",
             "/out",
-            ["--mount", 'type=bind,source="$(pwd)"/relative/path,target=/out'],
+            '--mount type=bind,source="$(pwd)"/relative/path,target=/out',
             id="relative path",
         ),
         pytest.param(
             "./relative/path",
             "/jiggy",
-            ["--mount", 'type=bind,source="$(pwd)"/./relative/path,target=/jiggy'],
+            '--mount type=bind,source="$(pwd)"/relative/path,target=/jiggy',
             id="single dotted relative path",
+        ),
+        pytest.param(
+            "../relative/path",
+            "/jiggy",
+            '--mount type=bind,source="$(pwd)"/../relative/path,target=/jiggy',
+            id="single upward relative path",
         ),
     ],
 )
 def test_docker_mount_args(given_host, given_container, want):
     got = suggest.docker_mount_args(given_host, given_container)
-    assert got == want
+    assert " ".join(got) == want
 
 
 some_image = "some-image:some-tag"
@@ -94,84 +100,29 @@ some_gh_template = "gh:audreyr/cookiecutter-pypackage"
     "given,want",
     [
         pytest.param(
-            input_docker_preamble_expanded + [some_image, "cookiecutter", "-f", "-s"],
-            expected_docker_preamble
-            + suggest.docker_mount_args('"$(pwd)"', "/out")
-            + [some_image]
-            + expected_cmd_preamble
-            + ["--overwrite-if-exists", "--skip-if-file-exists"],
-            id="normal",
-        ),
-        pytest.param(
-            input_docker_preamble_base + [some_image, "cookiecutter", "-f", "-s"],
-            expected_docker_preamble
-            + suggest.docker_mount_args('"$(pwd)"', "/out")
-            + [some_image]
-            + expected_cmd_preamble
-            + ["--overwrite-if-exists", "--skip-if-file-exists"],
-            id="normal - input missing -it --rm",
-        ),
-        pytest.param(
-            input_docker_preamble_base + [some_image, "cookiecutter", some_gh_template],
-            expected_docker_preamble
-            + suggest.docker_mount_args('"$(pwd)"', "/out")
-            + [some_image]
-            + expected_cmd_preamble
-            + [some_gh_template],
-            id="simple gh",
-        ),
-        pytest.param(
-            input_docker_preamble_expanded
-            + [some_image, "cookiecutter", "--verbose", "-o", "/some/path"],
-            expected_docker_preamble
-            + suggest.docker_mount_args("/some/path", "/out")
-            + [some_image]
-            + expected_cmd_preamble
-            + ["--verbose"],
-            id="-o maps to docker --mount",
-        ),
-        pytest.param(
-            input_docker_preamble_expanded
-            + [some_image, "cookiecutter", "-c", "the-branch", "/some/path"],
-            expected_docker_preamble
-            + suggest.docker_mount_args("/some/path", "/in")
-            + suggest.docker_mount_args('"$(pwd)"', "/out")
-            + [some_image]
-            + expected_cmd_preamble
-            + ["--checkout", "the-branch", "/in"],
-            id="local template maps to docker --mount",
-        ),
-        pytest.param(
-            input_docker_preamble_expanded + [some_image, "cookiecutters", "a,,b"],
-            expected_docker_preamble
-            + suggest.docker_mount_args("a", "/in-0")
-            + suggest.docker_mount_args("b", "/in-1")
-            + suggest.docker_mount_args('"$(pwd)"', "/out")
-            + [some_image]
-            + ["cookiecutters"]
-            + expected_o
-            + ["/in-0,,/in-1"],
-            id="cookiecutters - local templates map to docker --mounts",
-        ),
-        pytest.param(
-            input_docker_preamble_expanded
-            + [some_image, "cookiecutters", "a,,gh:some/git-project,,b"],
-            expected_docker_preamble
-            + suggest.docker_mount_args("a", "/in-0")
-            + suggest.docker_mount_args("b", "/in-2")
-            + suggest.docker_mount_args('"$(pwd)"', "/out")
-            + [some_image]
-            + ["cookiecutters"]
-            + expected_o
-            + ["/in-0,,gh:some/git-project,,/in-2"],
-            id="cookiecutters - mix of local and remote templates",
+            "docker run some:image",
+            'docker run -it --rm --user "$(id -u):$(id -g)" some:image',
+            id="normal - input without -it --rm",
         ),
     ],
 )
-def test_cookiecutter_to_docker_args_list(given, want):
-    got = suggest.cookiecutter_to_docker_args(given)
+def test_cookiecutter_to_docker_args_docker_preamble_except_mounts(
+    given: str, want: str
+):
+    # given
+    given_args = given.split(" ")
 
-    assert got == want
+    # when
+    got = suggest.cookiecutter_to_docker_args(given_args)
+    cc_index = get_cookiecutter_index(got)
+    got_docker = " ".join(got[:cc_index])
+
+    got_mounts = get_mounts_as_strings(got)
+    for mount in got_mounts:
+        got_docker = got_docker.replace(mount + " ", "")
+
+    # then
+    assert got_docker == want
 
 
 @pytest.mark.parametrize(
@@ -181,32 +132,78 @@ def test_cookiecutter_to_docker_args_list(given, want):
             "cookiecutter -o /output/folder /some/path/someTemplate",
             "cookiecutter -o /h/abs/output/folder /h/abs/some/path/someTemplate",
             [
-                '--mount type=bind,source="/output/folder",target="/h/abs/output/folder"',
-                '--mount type=bind,source="/some/path/someTemplate",target="/h/abs/some/path/someTemplate"',
+                "--mount type=bind,source=/output/folder,target=/h/abs/output/folder",
+                "--mount type=bind,source=/some/path/someTemplate,target=/h/abs/some/path/someTemplate",
             ],
             id="absolute - simple",
         ),
         pytest.param(
             "cookiecutter some/path/someTemplate",
-            "cookiecutter -o /h/rel/wd /h/rel/wd/some/path/someTemplate",
+            "cookiecutter -o /h/rel /h/rel/some/path/someTemplate",
             [
-                '--mount type=bind,source="$(pwd)",target="/h/rel/wd"',
+                '--mount type=bind,source="$(pwd)",target=/h/rel',
             ],
             id="relative - wd and below",
+        ),
+        pytest.param(
+            "cookiecutter -f -s tmpl",
+            "cookiecutter -o /h/rel --overwrite-if-exists --skip-if-file-exists /h/rel/tmpl",
+            [
+                '--mount type=bind,source="$(pwd)",target=/h/rel',
+            ],
+            id="cc args - some flags",
         ),
         pytest.param(
             "cookiecutter -o ../../output ../../../some/path/someTemplate",
             "cookiecutter -o /h/rel/dd/output /h/rel/some/path/someTemplate",
             [
-                '--mount type=bind,source="$(pwd)/../../output",target="/h/rel/dd/output"',
-                '--mount type=bind,source="$(pwd)/../../../some/path/someTemplate",target="/h/rel/some/path/someTemplate"',
+                '--mount type=bind,source="$(pwd)"/../../output,target=/h/rel/dd/output',
+                '--mount type=bind,source="$(pwd)"/../../../some/path/someTemplate,target=/h/rel/some/path/someTemplate',
             ],
-            id="relative - above wd - does not collapse dotted relations",
+            id="relative - above wd - collapses dotted relations",
+        ),
+        pytest.param(
+            "cookiecutter tmpl1,,tmpl2",
+            "cookiecutters -o /h/rel /h/rel/tmpl1,,/h/rel/tmpl2",
+            [
+                '--mount type=bind,source="$(pwd)",target=/h/rel',
+            ],
+            id="relative - multi cookiecutters templates",
+        ),
+        pytest.param(
+            "cookiecutter /tmpl1,,/tmpl2",
+            "cookiecutters -o /h/rel /h/abs/tmpl1,,/h/abs/tmpl2",
+            [
+                '--mount type=bind,source="$(pwd)",target=/h/rel',
+                "--mount type=bind,source=/tmpl1,target=/h/abs/tmpl1",
+                "--mount type=bind,source=/tmpl2,target=/h/abs/tmpl2",
+            ],
+            id="absolute - multi cookiecutters templates",
+        ),
+        pytest.param(
+            "cookiecutter " + some_gh_template,
+            "cookiecutter -o /h/rel " + some_gh_template,
+            [
+                '--mount type=bind,source="$(pwd)",target=/h/rel',
+            ],
+            id="remote - simple",
+        ),
+        pytest.param(
+            "cookiecutter /tmpl1,," + some_gh_template + ",,/tmpl2",
+            "cookiecutters -o /h/rel /h/abs/tmpl1,,"
+            + some_gh_template
+            + ",,/h/abs/tmpl2",
+            [
+                '--mount type=bind,source="$(pwd)",target=/h/rel',
+                "--mount type=bind,source=/tmpl1,target=/h/abs/tmpl1",
+                "--mount type=bind,source=/tmpl2,target=/h/abs/tmpl2",
+            ],
+            id="local + remote - multi cookiecutters templates",
         ),
     ],
 )
 def test_cookiecutter_to_docker_args_paths(
-    given_cookiecutter, want_cookiecutter, want_mounts
+    given_cookiecutter: str, want_cookiecutter: str, want_mounts: "list[str]"
 ):
     # given
     given_args = (
@@ -216,9 +213,23 @@ def test_cookiecutter_to_docker_args_paths(
 
     # when
     got = suggest.cookiecutter_to_docker_args(split_given_args)
-    got_cookiecutter = " ".join(got[got.index("cookiecutter") :])
-    got_mounts = [arg for arg in got if arg.startswith("--mount")]
+    cc_index = get_cookiecutter_index(got)
+    got_cookiecutter = " ".join(got[cc_index:])
+
+    got_mounts = get_mounts_as_strings(got)
 
     # then
     assert got_cookiecutter == want_cookiecutter
-    assert got_mounts == want_mounts
+    assert set(got_mounts) == set(want_mounts)
+
+
+def get_cookiecutter_index(args: "list[str]") -> int:
+    return next((i for i, x in enumerate(args) if x.startswith("cookiecutter")))
+
+
+def get_mounts_as_strings(args: "list[str]") -> "list[str]":
+    # combine the --mount and next element from the returned list so we can do simple
+    # string comparisons
+    return [
+        " ".join(args[i : i + 2]) for i, x in enumerate(args) if x.startswith("--mount")
+    ]

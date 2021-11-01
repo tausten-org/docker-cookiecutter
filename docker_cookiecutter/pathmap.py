@@ -95,6 +95,21 @@ class PathMap:
         return min_mounts, map_host_to_container_paths
 
 
+class PathMapBuilder:
+    """Accumulates paths and then builds a PathMap when asked."""
+
+    def __init__(self) -> None:
+        self.paths = []
+
+    def add_path(self, path: str):
+        self.paths.append(path)
+
+    def build(
+        self, container_abs: str, container_rel: str, container_dd: str
+    ) -> PathMap:
+        return PathMap(self.paths, container_abs, container_rel, container_dd)
+
+
 def split_relative(path: str) -> Tuple[str, str]:
     """
     Takes a normalized potentially relative path and splits it into the relative portion
@@ -110,7 +125,7 @@ def split_relative(path: str) -> Tuple[str, str]:
     return (rel, tail)
 
 
-def normalize_path(candidate):
+def normalize_path(candidate: str) -> str:
     """
     Path origin is unknown, but we wish to collapse consecutive separators down to singles
     and trim any final trailing separator (but only if the path is not for "root" folder)
@@ -125,10 +140,22 @@ def normalize_path(candidate):
     if len(norm) == 0 or norm.endswith(posixpath.pathsep):
         norm += posixpath.sep
 
-    return norm
+    return make_explicit_relative(norm)
 
 
-def transform_to_nix_path(candidate: str):
+def make_explicit_relative(candidate: str) -> str:
+    # If we're an absolute path or explicit relative path, then all done
+    if candidate.startswith(posixpath.sep) or candidate.startswith("."):
+        return candidate
+
+    # If relative path without "." then add that explicitly
+    if posixpath.pathsep not in candidate:
+        candidate = "." + posixpath.sep + candidate
+
+    return candidate
+
+
+def transform_to_nix_path(candidate: str) -> str:
     """
     Path origin is unknown, but we wish to transform it to a comparable *nix path
     """
@@ -142,7 +169,8 @@ def transform_to_nix_path(candidate: str):
 
     # finally, we normalize to unix
     norm = posixpath.normpath(norm)
-    return norm
+
+    return make_explicit_relative(norm)
 
 
 def reduce_mounts(inputs):
