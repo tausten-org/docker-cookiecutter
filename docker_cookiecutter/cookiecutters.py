@@ -1,10 +1,9 @@
-from typing import AnyStr
-
 from cookiecutter.main import cookiecutter
 from docker_cookiecutter.templates import decode_template_sources
 
 
-def cookiecutters(templates: AnyStr):
+# TODO: Actually implement this..  right now, this is mostly a stub
+def cookiecutters(templates: str) -> "list[str]":
     sources = decode_template_sources(templates)
     result = []
 
