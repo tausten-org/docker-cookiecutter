@@ -7,7 +7,6 @@ services:
       context: ..
       dockerfile: .devcontainer/Dockerfile
       args: 
-        VARIANT: "3"
         NODE_VERSION: "none"
     volumes:
       - ..:/docker-cookiecutter
