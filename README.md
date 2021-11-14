@@ -77,7 +77,19 @@ $ docker run -it --rm tausten/docker-cookiecutter:latest cookiecutter --help
 $ docker run -it --rm tausten/docker-cookiecutter:latest suggest docker run tausten/docker-cookiecutter:latest cookiecutter cookiecutter-pypackage/
 
 # Review the returned suggestion:
-docker run -it --rm --user "$(id -u):$(id -g)" --mount type=bind,source="$(pwd)"/cookiecutter-pypackage/,target=/in --mount type=bind,source="$(pwd)",target=/out tausten/docker-cookiecutter:latest cookiecutter -o /out /in
+docker run -it --rm --user "$(id -u):$(id -g)" --mount type=bind,source="$(pwd)",target=/h/rel tausten/docker-cookiecutter:latest cookiecutter -o /h/rel /h/rel/cookiecutter-pypackage
+
+# If it looks good, go ahead and execute it..  otherwise, make your desired adjustments then proceed.
+```
+
+- Github template example - `cookiecutter gh:audreyfeldroy/cookiecutter-pypackage`
+
+```sh
+# Get suggestion for how to execute your desired command
+$ docker run -it --rm tausten/docker-cookiecutter:latest suggest docker run tausten/docker-cookiecutter:latest cookiecutter gh:audreyfeldroy/cookiecutter-pypackage
+
+# Review the returned suggestion:
+docker run -it --rm --user "$(id -u):$(id -g)" --mount type=bind,source="$(pwd)",target=/h/rel tausten/docker-cookiecutter:latest cookiecutter -o /h/rel gh:audreyfeldroy/cookiecutter-pypackage
 
 # If it looks good, go ahead and execute it..  otherwise, make your desired adjustments then proceed.
 ```
