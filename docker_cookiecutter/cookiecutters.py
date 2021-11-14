@@ -1,4 +1,5 @@
 from cookiecutter.main import cookiecutter
+
 from docker_cookiecutter.templates import decode_template_sources
 
 
